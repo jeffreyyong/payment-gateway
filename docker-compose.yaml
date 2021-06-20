@@ -1,0 +1,11 @@
+# to have this run first time around, please run go mod vendor first :)
+version: '3.4'
+services:
+  postgres:
+    image: postgres:9.6.9-alpine
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db-payment-gateway
+    ports:
+      - 5432:5432
