@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS card
 
 );
 
--- TODO: add search indexes
 CREATE TABLE IF NOT EXISTS transaction
 (
     id               UUID        NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),

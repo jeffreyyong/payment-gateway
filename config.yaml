@@ -1,0 +1,1 @@
+POSTGRES_DSN: "postgres://username:password@postgres:5432/db-payment-gateway?sslmode=disable"

@@ -12,8 +12,6 @@ import (
 	"github.com/jeffreyyong/payment-gateway/internal/domain"
 )
 
-// TODO: think about idempotency?
-
 // CreateTransaction creates the first ever transaction, it will populate the transaction table, card table and
 // the payment_action table with Authorization type
 func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Authorization, processedDate time.Time) (*domain.Transaction, error) {
@@ -24,9 +22,10 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		stmtPaymentActionInsert *sql.Stmt
 		err                     error
 
-		cardID          uuid.UUID
-		transactionID   uuid.UUID
-		paymentActionID uuid.UUID
+		cardID            uuid.UUID
+		transactionID     uuid.UUID
+		paymentActionID   uuid.UUID
+		authorizationDate sql.NullTime
 	)
 
 	tx, err = s.Begin()
@@ -68,7 +67,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		values ($1, $2, $3, $4, $5, $6, $7)
 		on conflict (request_id)
 		do update set request_id = excluded.request_id
-		returning id
+		returning id, authorization_id
 	`)
 	if err != nil {
 		return nil, errors.Wrap(err, "prepare insert authorization statement")
@@ -77,7 +76,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 
 	if err = stmtTransactionInsert.
 		QueryRowContext(ctx, cardID, authorizationID, authorization.RequestID, authorization.Amount.MinorUnits, authorization.Amount.Currency, processedDate, processedDate).
-		Scan(&transactionID); err != nil {
+		Scan(&transactionID, &authorizationID); err != nil {
 		return nil, errors.Wrap(err, "execute insert authorization statement")
 	}
 
@@ -87,7 +86,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		on conflict (request_id)
 		do update set request_id = excluded.request_id
-		returning id
+		returning id, created_date
 	`)
 	if err != nil {
 		return nil, errors.Wrap(err, "prepare insert payment action statement")
@@ -98,19 +97,19 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		QueryRowContext(ctx, authorizationID, domain.PaymentActionTypeAuthorization,
 			domain.PaymentActionStatusSuccess, authorization.Amount.MinorUnits, authorization.Amount.Currency,
 			authorization.RequestID, transactionID, processedDate, processedDate).
-		Scan(&paymentActionID); err != nil {
+		Scan(&paymentActionID, &authorizationDate); err != nil {
 		return nil, errors.Wrap(err, "execute insert payment action statement")
 	}
 
 	paymentAction := &domain.PaymentAction{
 		Type:          domain.PaymentActionTypeAuthorization,
 		Status:        domain.PaymentActionStatusSuccess,
-		ProcessedDate: processedDate,
+		ProcessedDate: authorizationDate.Time,
 		Amount:        &authorization.Amount,
 		RequestID:     authorization.RequestID,
 	}
 
-	transactionRes := &domain.Transaction{
+	t := &domain.Transaction{
 		ID:              transactionID,
 		RequestID:       authorization.RequestID,
 		AuthorizationID: authorizationID,
@@ -119,13 +118,14 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 			paymentAction,
 		},
 	}
+	t.Amounts()
 
 	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
 
-	return transactionRes, nil
+	return t, nil
 }
 
 //CreatePaymentAction will create payment action for a particular transaction.
@@ -217,9 +217,7 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 			&paymentActionType, &paymentActionStatus, &paymentActionAmount, &paymentActionCurrency, &paymentActionRequestID, &paymentActionProcessedDate); err != nil {
 			return nil, errors.Wrap(err, "get transaction scanning")
 		}
-		// TODO: this can be mapped properly
 		exponent := 2
-
 		var amount *domain.Amount
 		if paymentActionAmount.Valid {
 			amount = &domain.Amount{

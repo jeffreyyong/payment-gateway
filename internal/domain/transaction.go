@@ -7,10 +7,10 @@ import (
 	uuid "github.com/kevinburke/go.uuid"
 )
 
-// TODO: add more tests in domain
 var (
 	ErrTransactionNotAuthorized = errors.New("transaction not authorized")
 	ErrTransactionNotFound      = errors.New("transaction not found")
+	ErrUnprocessable            = errors.New("unprocessable")
 )
 
 type PaymentActionType string
@@ -26,13 +26,6 @@ const (
 	PaymentActionTypeVoid          PaymentActionType = "void"
 	PaymentActionTypeCapture       PaymentActionType = "capture"
 	PaymentActionTypeRefund        PaymentActionType = "refund"
-)
-
-const (
-	TransactionStatusAuthorized TransactionStatus = "authorized"
-	TransactionStatusVoided     TransactionStatus = "voided"
-	TransactionStatusCaptured   TransactionStatus = "captured"
-	TransactionStatusRefunded   TransactionStatus = "refunded"
 )
 
 const (
@@ -116,6 +109,24 @@ func (p PaymentAction) RefundSuccess() bool {
 	return p.Type == PaymentActionTypeRefund && p.Status == PaymentActionStatusSuccess
 }
 
+func (t Transaction) AuthorizationDate() (time.Time, error) {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.AuthorizationSuccess() {
+			return pa.ProcessedDate, nil
+		}
+	}
+	return time.Time{}, errors.New("transaction missing authorization date")
+}
+
+func (t Transaction) IsRequestIDIdempotent(pat PaymentActionType, requestID uuid.UUID) bool {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.Type == pat && pa.RequestID == requestID {
+			return true
+		}
+	}
+	return false
+}
+
 func (t Transaction) Voided() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.VoidSuccess() {
@@ -128,6 +139,15 @@ func (t Transaction) Voided() bool {
 func (t Transaction) Refunded() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.RefundSuccess() {
+			return true
+		}
+	}
+	return false
+}
+
+func (t Transaction) Captured() bool {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.CaptureSuccess() {
 			return true
 		}
 	}
@@ -208,6 +228,17 @@ func (t Transaction) ValidateRefund(a Amount) error {
 
 	if (t.RefundedAmount.MinorUnits + a.MinorUnits) > t.CapturedAmount.MinorUnits {
 		return errors.New("amount to be refunded > captured amount")
+	}
+	return nil
+}
+
+func (t Transaction) ValidateVoid() error {
+	if t.Voided() {
+		return errors.New("transaction is already voided")
+	}
+
+	if t.Captured() {
+		return errors.New("transaction is already captured")
 	}
 	return nil
 }

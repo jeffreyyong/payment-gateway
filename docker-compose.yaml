@@ -9,3 +9,19 @@ services:
       POSTGRES_DB: db-payment-gateway
     ports:
       - 5432:5432
+  api:
+    container_name: "payment-gateway"
+    build:
+      context: .
+    volumes:
+      - .:/go/src/github.com/jeffreyyong/payment-gateway
+    ports:
+      - 8080:8080
+      - 8082:8082
+    tty: true
+    restart: on-failure
+    environment:
+      - CONFIG_FILE=/go/src/github.com/jeffreyyong/payment-gateway/config.yaml
+      - VAULT_SECRETS_FILE=/go/src/github.com/jeffreyyong/payment-gateway/vault-secrets.toml
+    depends_on:
+      - postgres
