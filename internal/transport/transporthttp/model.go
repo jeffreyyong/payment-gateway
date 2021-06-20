@@ -21,6 +21,12 @@ type CaptureRequest struct {
 	Amount          Amount    `json:"amount"`
 }
 
+type RefundRequest struct {
+	AuthorizationID uuid.UUID `json:"authorization_id"`
+	RequestID       uuid.UUID `json:"request_id"`
+	Amount          Amount    `json:"amount"`
+}
+
 type Recipient struct {
 	Postcode string `json:"postcode"` // The first part of the UK postcode for example W1T 4TJ would be W1T
 	LastName string `json:"last_name"`

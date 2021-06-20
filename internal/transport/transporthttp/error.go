@@ -15,29 +15,27 @@ const (
 	CodeNone = "none"
 
 	CodeUnauthorized       = "unauthorized"
-	CodeTokenExpired       = "auth_token_expired"
 	CodeForbidden          = "permission_denied"
 	CodeNotFound           = "not_found"
-	CodeOperationNotFound  = "operation_not_found"
 	CodeBadResponse        = "bad_response"
 	CodeUnknownFailure     = "unknown_failure"
 	CodeConflict           = "conflict"
 	CodeBadRequest         = "bad_request"
 	CodePreconditionFailed = "failed_precondition"
+	CodeUnprocessable      = "unprocessable"
 )
 
 var (
 	codeMap = map[string]int{
 		CodeNone:               http.StatusBadGateway,
 		CodeUnauthorized:       http.StatusUnauthorized,
-		CodeTokenExpired:       http.StatusUnauthorized,
 		CodeForbidden:          http.StatusForbidden,
 		CodeNotFound:           http.StatusNotFound,
-		CodeOperationNotFound:  http.StatusNotFound,
 		CodeBadResponse:        http.StatusBadGateway,
 		CodeUnknownFailure:     http.StatusInternalServerError,
 		CodeBadRequest:         http.StatusBadRequest,
 		CodeConflict:           http.StatusConflict,
+		CodeUnprocessable:      http.StatusUnprocessableEntity,
 		CodePreconditionFailed: http.StatusPreconditionFailed,
 	}
 )

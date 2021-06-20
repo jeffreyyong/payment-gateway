@@ -31,6 +31,7 @@ type Service struct {
 	clock clockwork.Clock
 }
 
+// TODO: have to map more unporcessable entity error
 // TODO: do more validation in the service layer
 // TODO: Can transactions be partially authorized?
 func (s *Service) Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error) {
@@ -69,7 +70,7 @@ func (s *Service) Void(ctx context.Context, void *domain.Void) (*domain.Transact
 	}
 
 	if transaction.Voided() {
-		err = errors.Wrap(err, "transaction is already voided")
+		err = errors.Wrap(domain.ErrUnprocessable, "transaction is already voided")
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (s *Service) Capture(ctx context.Context, capture *domain.Capture) (*domain
 	}
 
 	if err = transaction.ValidateCapture(capture.Amount); err != nil {
-		err = errors.Wrap(err, "transaction cannot be captured")
+		err = errors.Wrap(domain.ErrUnprocessable, err.Error())
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (s *Service) Refund(ctx context.Context, refund *domain.Refund) (*domain.Tr
 	}
 
 	if err = transaction.ValidateRefund(refund.Amount); err != nil {
-		err = errors.Wrap(err, "transaction cannot be refunded")
+		err = errors.Wrap(domain.ErrUnprocessable, err.Error())
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
 	}

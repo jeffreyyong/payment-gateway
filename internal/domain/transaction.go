@@ -11,6 +11,7 @@ import (
 var (
 	ErrTransactionNotAuthorized = errors.New("transaction not authorized")
 	ErrTransactionNotFound      = errors.New("transaction not found")
+	ErrUnprocessable            = errors.New("unprocessable")
 )
 
 type PaymentActionType string
@@ -26,13 +27,6 @@ const (
 	PaymentActionTypeVoid          PaymentActionType = "void"
 	PaymentActionTypeCapture       PaymentActionType = "capture"
 	PaymentActionTypeRefund        PaymentActionType = "refund"
-)
-
-const (
-	TransactionStatusAuthorized TransactionStatus = "authorized"
-	TransactionStatusVoided     TransactionStatus = "voided"
-	TransactionStatusCaptured   TransactionStatus = "captured"
-	TransactionStatusRefunded   TransactionStatus = "refunded"
 )
 
 const (

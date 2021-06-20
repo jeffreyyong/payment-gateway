@@ -64,3 +64,18 @@ func (mr *MockServiceMockRecorder) Capture(arg0, arg1 interface{}) *gomock.Call 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Capture", reflect.TypeOf((*MockService)(nil).Capture), arg0, arg1)
 }
+
+// Refund mocks base method.
+func (m *MockService) Refund(arg0 context.Context, arg1 *domain.Refund) (*domain.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Refund", arg0, arg1)
+	ret0, _ := ret[0].(*domain.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Refund indicates an expected call of Refund.
+func (mr *MockServiceMockRecorder) Refund(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refund", reflect.TypeOf((*MockService)(nil).Refund), arg0, arg1)
+}
