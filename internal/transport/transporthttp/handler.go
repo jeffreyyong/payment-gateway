@@ -106,9 +106,15 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 
 	t, err := h.service.Authorize(ctx, authorization)
 	if err != nil {
-		errMsg := "failed to authorize transaction in service"
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
+		switch {
+		case errors.Is(err, domain.ErrUnprocessable):
+			_ = WriteError(w, err.Error(), CodeUnprocessable)
+			return
+		default:
+			errMsg := "failed to authorize transaction in service"
+			_ = WriteError(w, errMsg, CodeUnknownFailure)
+			return
+		}
 	}
 
 	transactionRes, err := mapToTransactionResp(t)

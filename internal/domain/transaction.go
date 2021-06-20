@@ -85,6 +85,7 @@ type Transaction struct {
 	PaymentActionSummary []*PaymentAction
 }
 
+// TODO: can pull this to different package
 type PaymentAction struct {
 	Type          PaymentActionType
 	Status        PaymentActionStatus
