@@ -186,7 +186,6 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 }
 
 func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (*domain.Transaction, error) {
-	// TODO: order by created date for the payment action
 	rows, err := s.QueryContext(ctx, `
 		select t.id as t_id, t.request_id as t_request_id, t.amount, t.currency, p.id as p_id, p.type, p.status, p.amount, p.currency, p.request_id as p_request_id, p.updated_date
 		from transaction t JOIN payment_action p ON t.id = p.transaction_id where t.authorization_id = $1 order by p.created_date;
@@ -249,17 +248,18 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 		return nil, domain.ErrTransactionNotFound
 	}
 
-	return &domain.Transaction{
+	transaction := &domain.Transaction{
 		ID:              transactionID,
 		RequestID:       transactionRequestID,
 		AuthorizationID: authorizationID,
-		// TODO: don't need to return payment source in the transaction
-		PaymentSource: domain.PaymentSource{},
 		Amount: domain.Amount{
 			MinorUnits: uint64(transactionAmount.Int64),
 			Currency:   transactionCurrency.String,
 			Exponent:   2,
 		},
 		PaymentActionSummary: paymentActionSummary,
-	}, nil
+	}
+	transaction.Amounts()
+
+	return transaction, nil
 }
