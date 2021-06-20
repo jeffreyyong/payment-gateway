@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -59,7 +61,7 @@ func setup(ctx context.Context, s *app.Service) ([]app.Listener, context.Context
 		return nil, ctx, errors.Wrap(err, "unable to migrate repository")
 	}
 
-	svc, err := service.NewService(store)
+	svc, err := service.NewService(store, service.WithClock(clockwork.NewRealClock()))
 
 	if err != nil {
 		logging.Error(ctx, "creating_service", zap.Error(err))

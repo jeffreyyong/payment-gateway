@@ -3,17 +3,13 @@ package healthcheck
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/jeffreyyong/payment-gateway/internal/logging"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	dd "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
-
-	"github.com/jeffreyyong/payment-gateway/internal/logging"
 )
 
 // Health check related errors.
@@ -80,43 +76,6 @@ func (c *DefaultChecker) Health(ctx context.Context) *Service {
 	}
 
 	return service
-}
-
-// NewDB returns a new database/sql.DB health checker.
-func NewDB(name string, pinger Pinger) Checker {
-	return NewDefaultChecker(name, func(ctx context.Context) error {
-		return pinger.Ping(ctx)
-	})
-}
-
-// NewAPI returns a new API ping checker.
-func NewAPI(client Doer, name, endpoint string) Checker {
-	if v, ok := client.(*http.Client); ok {
-		client = dd.WrapClient(v)
-	}
-
-	return NewDefaultChecker(name, func(ctx context.Context) error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return err
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-			return err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return errors.WithMessage(ErrHTTPStatus, resp.Status)
-		}
-
-		return nil
-	})
 }
 
 // CheckAll checks all services' health returning a health check response.

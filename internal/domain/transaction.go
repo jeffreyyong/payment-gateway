@@ -44,6 +44,14 @@ type Authorization struct {
 	RequestID     uuid.UUID
 	PaymentSource PaymentSource
 	Amount        Amount
+	Recipient     Recipient
+}
+
+// Not mandatory
+type Recipient struct {
+	DateOfBirth time.Time
+	Postcode    string
+	LastName    string
 }
 
 type Capture struct {
@@ -114,6 +122,15 @@ func (p PaymentAction) CaptureSuccess() bool {
 
 func (p PaymentAction) RefundSuccess() bool {
 	return p.Type == PaymentActionTypeRefund && p.Status == PaymentActionStatusSuccess
+}
+
+func (t Transaction) AuthorizationDate() (time.Time, error) {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.AuthorizationSuccess() {
+			return pa.ProcessedDate, nil
+		}
+	}
+	return time.Time{}, errors.New("transaction missing authorization date")
 }
 
 func (t Transaction) Voided() bool {

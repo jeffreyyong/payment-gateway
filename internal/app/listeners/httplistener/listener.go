@@ -100,16 +100,6 @@ func WithAddr(addr string) Option {
 	return func(l *Listener) { l.addr = addr }
 }
 
-func WithWriteTimeout(t time.Duration) Option {
-	return func(l *Listener) { l.server.WriteTimeout = t }
-}
-
-// WithRequestLogged existed to turn on request and response logging.
-// Deprecated: this was required when logging was opt-in (vs opt-out)
-func WithRequestLogged() Option {
-	return func(l *Listener) {}
-}
-
 // WithRequestLoggingDisabled explicitly disables the logging middleware.
 func WithRequestLoggingDisabled() Option {
 	return func(l *Listener) { l.isRequestLoggingDisabled = true }
