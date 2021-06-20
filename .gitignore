@@ -1,0 +1,6 @@
+vendor/
+.env
+/app*
+.idea/
+.DS_Store
+integration.out
