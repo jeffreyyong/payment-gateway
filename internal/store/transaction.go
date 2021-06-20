@@ -110,12 +110,10 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		RequestID:     authorization.RequestID,
 	}
 
-	// TODO: don't need to return payment source in the authorization
 	transactionRes := &domain.Transaction{
 		ID:              transactionID,
 		RequestID:       authorization.RequestID,
 		AuthorizationID: authorizationID,
-		PaymentSource:   authorization.PaymentSource,
 		Amount:          authorization.Amount,
 		PaymentActionSummary: []*domain.PaymentAction{
 			paymentAction,
@@ -191,7 +189,7 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 	// TODO: order by created date for the payment action
 	rows, err := s.QueryContext(ctx, `
 		select t.id as t_id, t.request_id as t_request_id, t.amount, t.currency, p.id as p_id, p.type, p.status, p.amount, p.currency, p.request_id as p_request_id, p.updated_date
-		from transaction t JOIN payment_action p ON t.id = p.transaction_id where t.authorization_id = $1;
+		from transaction t JOIN payment_action p ON t.id = p.transaction_id where t.authorization_id = $1 order by p.created_date;
 		`, authorizationID)
 
 	if err != nil {
@@ -220,23 +218,24 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 			&paymentActionType, &paymentActionStatus, &paymentActionAmount, &paymentActionCurrency, &paymentActionRequestID, &paymentActionProcessedDate); err != nil {
 			return nil, errors.Wrap(err, "get transaction scanning")
 		}
-		// TODO: this has to be fixed
+		// TODO: this can be mapped properly
 		exponent := 2
-		if paymentActionAmount.Int64 == 0 {
-			exponent = 0
+
+		var amount *domain.Amount
+		if paymentActionAmount.Valid {
+			amount = &domain.Amount{
+				MinorUnits: uint64(paymentActionAmount.Int64),
+				Currency:   paymentActionCurrency.String,
+				Exponent:   uint8(exponent),
+			}
 		}
 
 		paymentAction := &domain.PaymentAction{
 			Type:          domain.PaymentActionType(paymentActionType.String),
 			Status:        domain.PaymentActionStatus(paymentActionStatus.String),
 			ProcessedDate: paymentActionProcessedDate.Time,
-			Amount: &domain.Amount{
-				MinorUnits: uint64(paymentActionAmount.Int64),
-				Currency:   paymentActionCurrency.String,
-				// TODO: map exponent based on currency
-				Exponent: uint8(exponent),
-			},
-			RequestID: paymentActionRequestID,
+			Amount:        amount,
+			RequestID:     paymentActionRequestID,
 		}
 
 		paymentActionSummary = append(paymentActionSummary, paymentAction)
@@ -259,8 +258,7 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 		Amount: domain.Amount{
 			MinorUnits: uint64(transactionAmount.Int64),
 			Currency:   transactionCurrency.String,
-			// TODO: map exponent based on currency
-			Exponent: 2,
+			Exponent:   2,
 		},
 		PaymentActionSummary: paymentActionSummary,
 	}, nil
