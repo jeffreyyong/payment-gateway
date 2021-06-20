@@ -21,6 +21,7 @@ const (
 	EndpointAuthorize = "/authorize"
 	EndpointCapture   = "/capture"
 	EndpointRefund    = "/refund"
+	EndpointVoid      = "/void"
 
 	ContentType     = "Content-Type"
 	ApplicationJSON = "application/json"
@@ -31,6 +32,7 @@ type Service interface {
 	Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error)
 	Capture(ctx context.Context, capture *domain.Capture) (*domain.Transaction, error)
 	Refund(ctx context.Context, refund *domain.Refund) (*domain.Transaction, error)
+	Void(ctx context.Context, void *domain.Void) (*domain.Transaction, error)
 }
 
 // httpHandler is the http handler that will enable
@@ -55,6 +57,7 @@ func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
 	m.HandleFunc(EndpointAuthorize, h.Authorize).Methods(http.MethodPost)
 	m.HandleFunc(EndpointCapture, h.Capture).Methods(http.MethodPost)
 	m.HandleFunc(EndpointRefund, h.Refund).Methods(http.MethodPost)
+	m.HandleFunc(EndpointVoid, h.Void).Methods(http.MethodPost)
 }
 
 // TODO: if request ID is the same, tell the client is no op
@@ -298,6 +301,96 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			errMsg := "failed to refund transaction in service"
+			_ = WriteError(w, errMsg, CodeUnknownFailure)
+			return
+		}
+	}
+
+	authorizationDate, err := t.AuthorizationDate()
+	if err != nil {
+		errMsg := "invalid transaction with no authorization date"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+
+	transactionRes := Transaction{
+		ID:              t.ID,
+		AuthorizationID: t.AuthorizationID,
+		AuthorizedTime:  &authorizationDate,
+		AuthorizedAmount: Amount{
+			MinorUnits: t.AuthorizedAmount.MinorUnits,
+			Exponent:   t.AuthorizedAmount.Exponent,
+			Currency:   t.AuthorizedAmount.Currency,
+		},
+		CapturedAmount: Amount{
+			MinorUnits: t.CapturedAmount.MinorUnits,
+			Exponent:   t.CapturedAmount.Exponent,
+			Currency:   t.CapturedAmount.Currency,
+		},
+		RefundedAmount: Amount{
+			MinorUnits: t.RefundedAmount.MinorUnits,
+			Exponent:   t.RefundedAmount.Exponent,
+			Currency:   t.RefundedAmount.Currency,
+		},
+		IsVoided: t.Voided(),
+	}
+
+	w.Header().Add(ContentType, ApplicationJSON)
+	err = json.NewEncoder(w).Encode(transactionRes)
+	if err != nil {
+		errMsg := "error encoding json response"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+}
+
+// TODO: pull out the parsing of transaction response
+func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		errMsg := "error reading request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if len(body) == 0 {
+		errMsg := "missing request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	var req VoidRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	void := &domain.Void{
+		RequestID:       req.RequestID,
+		AuthorizationID: req.AuthorizationID,
+	}
+
+	t, err := h.service.Void(ctx, void)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrTransactionNotFound):
+			errMsg := "unable to find the transaction with the authorization ID"
+			_ = WriteError(w, errMsg, CodeNotFound)
+			return
+		case errors.Is(err, domain.ErrUnprocessable):
+			_ = WriteError(w, err.Error(), CodeUnprocessable)
+			return
+		default:
+			errMsg := "failed to void transaction in service"
 			_ = WriteError(w, errMsg, CodeUnknownFailure)
 			return
 		}

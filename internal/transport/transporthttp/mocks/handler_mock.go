@@ -79,3 +79,18 @@ func (mr *MockServiceMockRecorder) Refund(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refund", reflect.TypeOf((*MockService)(nil).Refund), arg0, arg1)
 }
+
+// Void mocks base method.
+func (m *MockService) Void(arg0 context.Context, arg1 *domain.Void) (*domain.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Void", arg0, arg1)
+	ret0, _ := ret[0].(*domain.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Void indicates an expected call of Void.
+func (mr *MockServiceMockRecorder) Void(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Void", reflect.TypeOf((*MockService)(nil).Void), arg0, arg1)
+}

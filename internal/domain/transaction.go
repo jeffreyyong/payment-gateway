@@ -153,6 +153,15 @@ func (t Transaction) Refunded() bool {
 	return false
 }
 
+func (t Transaction) Captured() bool {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.CaptureSuccess() {
+			return true
+		}
+	}
+	return false
+}
+
 func (t Transaction) HasPaymentAction(pat PaymentActionType) bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.Type == pat && pa.Status == PaymentActionStatusSuccess {
@@ -227,6 +236,17 @@ func (t Transaction) ValidateRefund(a Amount) error {
 
 	if (t.RefundedAmount.MinorUnits + a.MinorUnits) > t.CapturedAmount.MinorUnits {
 		return errors.New("amount to be refunded > captured amount")
+	}
+	return nil
+}
+
+func (t Transaction) ValidateVoid() error {
+	if t.Voided() {
+		return errors.New("transaction is already voided")
+	}
+
+	if t.Captured() {
+		return errors.New("transaction is already captured")
 	}
 	return nil
 }

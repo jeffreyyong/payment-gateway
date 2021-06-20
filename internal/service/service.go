@@ -69,8 +69,8 @@ func (s *Service) Void(ctx context.Context, void *domain.Void) (*domain.Transact
 		return transaction, nil
 	}
 
-	if transaction.Voided() {
-		err = errors.Wrap(domain.ErrUnprocessable, "transaction is already voided")
+	if err := transaction.ValidateVoid(); err != nil {
+		err = errors.Wrap(domain.ErrUnprocessable, err.Error())
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
 	}
