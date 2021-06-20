@@ -32,6 +32,7 @@ type Service struct {
 	clock clockwork.Clock
 }
 
+// TODO: do more validation in the service layer
 // TODO: Can transactions be partially authorized?
 func (s *Service) Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error) {
 	const errLogMsg = "unable to authorize transaction"

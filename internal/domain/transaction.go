@@ -49,9 +49,8 @@ type Authorization struct {
 
 // Not mandatory
 type Recipient struct {
-	DateOfBirth time.Time
-	Postcode    string
-	LastName    string
+	Postcode string
+	LastName string
 }
 
 type Capture struct {

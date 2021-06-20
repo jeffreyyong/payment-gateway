@@ -16,7 +16,7 @@ import (
 	"github.com/jeffreyyong/payment-gateway/internal/logging"
 	"github.com/jeffreyyong/payment-gateway/internal/service"
 	"github.com/jeffreyyong/payment-gateway/internal/store"
-	transporthttp "github.com/jeffreyyong/payment-gateway/internal/transport/http"
+	transporthttp "github.com/jeffreyyong/payment-gateway/internal/transport/transporthttp"
 )
 
 const (

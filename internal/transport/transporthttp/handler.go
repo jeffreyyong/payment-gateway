@@ -1,4 +1,6 @@
-package http
+//go:generate mockgen -package http -self_package github.com/jeffreyyong/payment-gateway/internal/transport/http -destination handler_mock.go github.com/jeffreyyong/payment-gateway/internal/transport/http Service
+
+package transporthttp
 
 import (
 	"context"
@@ -16,10 +18,10 @@ import (
 )
 
 const (
-	endpointAuthorize = "/authorize"
+	EndpointAuthorize = "/authorize"
 
-	contentType     = "Content-Type"
-	applicationJSON = "application/json"
+	ContentType     = "Content-Type"
+	ApplicationJSON = "application/json"
 )
 
 // Service represents an interface for a service layer allowing HTTP routing logic and business logic to be separated
@@ -46,7 +48,7 @@ func NewHTTPHandler(service Service) (*httpHandler, error) {
 
 // ApplyRoutes will link the HTTP REST endpoint to the corresponding function in this handler
 func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
-	m.HandleFunc(endpointAuthorize, h.Authorize).Methods(http.MethodPost)
+	m.HandleFunc(EndpointAuthorize, h.Authorize).Methods(http.MethodPost)
 }
 
 func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
@@ -97,9 +99,8 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 			Exponent:   req.Amount.Exponent,
 		},
 		Recipient: domain.Recipient{
-			DateOfBirth: req.Recipient.DateOfBirth.Time,
-			Postcode:    req.Recipient.Postcode,
-			LastName:    req.Recipient.LastName,
+			Postcode: req.Recipient.Postcode,
+			LastName: req.Recipient.LastName,
 		},
 	}
 
@@ -114,7 +115,7 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 
 	authorizationDate, err := t.AuthorizationDate()
 	if err != nil {
-		errMsg := "invalid transaction"
+		errMsg := "invalid transaction with no authorization date"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
@@ -142,7 +143,7 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		IsVoided: t.Voided(),
 	}
 
-	w.Header().Add(contentType, applicationJSON)
+	w.Header().Add(ContentType, ApplicationJSON)
 	err = json.NewEncoder(w).Encode(transactionRes)
 	if err != nil {
 		errMsg := "error encoding json response"
@@ -150,66 +151,4 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
 	}
-}
-
-type ServerError struct {
-	Code    string `json:"code"`
-	Message string `json:"message,omitempty"`
-}
-
-const (
-	CodeNone = "none"
-
-	CodeUnauthorized       = "unauthorized"
-	CodeTokenExpired       = "auth_token_expired"
-	CodeForbidden          = "permission_denied"
-	CodeNotFound           = "not_found"
-	CodeOperationNotFound  = "operation_not_found"
-	CodeBadResponse        = "bad_response"
-	CodeUnknownFailure     = "unknown_failure"
-	CodeConflict           = "conflict"
-	CodeBadRequest         = "bad_request"
-	CodePreconditionFailed = "failed_precondition"
-)
-
-var (
-	codeMap = map[string]int{
-		CodeNone:               http.StatusBadGateway,
-		CodeUnauthorized:       http.StatusUnauthorized,
-		CodeTokenExpired:       http.StatusUnauthorized,
-		CodeForbidden:          http.StatusForbidden,
-		CodeNotFound:           http.StatusNotFound,
-		CodeOperationNotFound:  http.StatusNotFound,
-		CodeBadResponse:        http.StatusBadGateway,
-		CodeUnknownFailure:     http.StatusInternalServerError,
-		CodeBadRequest:         http.StatusBadRequest,
-		CodeConflict:           http.StatusConflict,
-		CodePreconditionFailed: http.StatusPreconditionFailed,
-	}
-)
-
-//WriteError writes a json response and pre-registered http status error
-// always writes response even when producing an error
-func WriteError(w http.ResponseWriter, message, code string) error {
-	serverError := ServerError{
-		Code:    code,
-		Message: message,
-	}
-	var err error
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	sc, ok := codeMap[serverError.Code]
-	if !ok {
-		err = fmt.Errorf("code not registered %v", serverError)
-		sc = codeMap[serverError.Code]
-	}
-	w.WriteHeader(sc)
-
-	enc := json.NewEncoder(w)
-
-	if encErr := enc.Encode(serverError); encErr != nil {
-		// allow encoding error to override the unregistered code error
-		err = encErr
-	}
-
-	return err
 }

@@ -68,7 +68,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		values ($1, $2, $3, $4, $5, $6, $7)
 		on conflict (request_id)
 		do update set request_id = excluded.request_id
-		returning id
+		returning id, authorization_id
 	`)
 	if err != nil {
 		return nil, errors.Wrap(err, "prepare insert authorization statement")
@@ -77,7 +77,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 
 	if err = stmtTransactionInsert.
 		QueryRowContext(ctx, cardID, authorizationID, authorization.RequestID, authorization.Amount.MinorUnits, authorization.Amount.Currency, processedDate, processedDate).
-		Scan(&transactionID); err != nil {
+		Scan(&transactionID, &authorizationID); err != nil {
 		return nil, errors.Wrap(err, "execute insert authorization statement")
 	}
 
@@ -110,7 +110,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		RequestID:     authorization.RequestID,
 	}
 
-	transactionRes := &domain.Transaction{
+	t := &domain.Transaction{
 		ID:              transactionID,
 		RequestID:       authorization.RequestID,
 		AuthorizationID: authorizationID,
@@ -119,13 +119,14 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 			paymentAction,
 		},
 	}
+	t.Amounts()
 
 	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
 
-	return transactionRes, nil
+	return t, nil
 }
 
 //CreatePaymentAction will create payment action for a particular transaction.
