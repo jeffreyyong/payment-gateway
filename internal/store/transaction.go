@@ -248,7 +248,7 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 		return nil, domain.ErrTransactionNotFound
 	}
 
-	return &domain.Transaction{
+	transaction := &domain.Transaction{
 		ID:              transactionID,
 		RequestID:       transactionRequestID,
 		AuthorizationID: authorizationID,
@@ -258,5 +258,8 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 			Exponent:   2,
 		},
 		PaymentActionSummary: paymentActionSummary,
-	}, nil
+	}
+	transaction.Amounts()
+
+	return transaction, nil
 }

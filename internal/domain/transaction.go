@@ -7,6 +7,7 @@ import (
 	uuid "github.com/kevinburke/go.uuid"
 )
 
+// TODO: add more tests in domain
 var (
 	ErrTransactionNotAuthorized = errors.New("transaction not authorized")
 	ErrTransactionNotFound      = errors.New("transaction not found")
@@ -85,6 +86,9 @@ type Transaction struct {
 	AuthorizationID      uuid.UUID
 	PaymentSource        PaymentSource
 	Amount               Amount
+	AuthorizedAmount     Amount
+	CapturedAmount       Amount
+	RefundedAmount       Amount
 	PaymentActionSummary []*PaymentAction
 }
 
@@ -139,7 +143,8 @@ func (t Transaction) HasPaymentAction(pat PaymentActionType) bool {
 	return false
 }
 
-func (t Transaction) amounts() (authorized, captured, refunded uint64) {
+func (t *Transaction) Amounts() {
+	var authorized, captured, refunded uint64
 	for _, pa := range t.PaymentActionSummary {
 		if pa.AuthorizationSuccess() {
 			authorized = pa.Amount.MinorUnits
@@ -153,7 +158,24 @@ func (t Transaction) amounts() (authorized, captured, refunded uint64) {
 			refunded += pa.Amount.MinorUnits
 		}
 	}
-	return
+	currency := t.Amount.Currency
+	exponent := t.Amount.Exponent
+	t.AuthorizedAmount = Amount{
+		MinorUnits: authorized,
+		Currency:   currency,
+		Exponent:   exponent,
+	}
+
+	t.CapturedAmount = Amount{
+		MinorUnits: captured,
+		Currency:   currency,
+		Exponent:   exponent,
+	}
+	t.RefundedAmount = Amount{
+		MinorUnits: refunded,
+		Currency:   currency,
+		Exponent:   exponent,
+	}
 }
 
 func (t Transaction) ValidateCapture(a Amount) error {
@@ -169,8 +191,7 @@ func (t Transaction) ValidateCapture(a Amount) error {
 		return errors.New("currency is different")
 	}
 
-	authorizedAmount, capturedAmount, _ := t.amounts()
-	if (capturedAmount + a.MinorUnits) > authorizedAmount {
+	if (t.CapturedAmount.MinorUnits + a.MinorUnits) > t.AuthorizedAmount.MinorUnits {
 		return errors.New("amount to be captured > authorized amount")
 	}
 	return nil
@@ -185,8 +206,7 @@ func (t Transaction) ValidateRefund(a Amount) error {
 		return errors.New("currency is different")
 	}
 
-	_, capturedAmount, refundedAmount := t.amounts()
-	if (refundedAmount + a.MinorUnits) > capturedAmount {
+	if (t.RefundedAmount.MinorUnits + a.MinorUnits) > t.CapturedAmount.MinorUnits {
 		return errors.New("amount to be refunded > captured amount")
 	}
 	return nil

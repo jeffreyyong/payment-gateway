@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/golang/mock/mockgen/model"
 	"github.com/jonboulle/clockwork"
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/pkg/errors"

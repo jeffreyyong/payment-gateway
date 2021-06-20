@@ -106,11 +106,12 @@ var (
 	}
 
 	mockAuthorizedTransaction = domain.Transaction{
-		ID:              transactionID,
-		RequestID:       authorization.RequestID,
-		AuthorizationID: authorizationID,
-		PaymentSource:   authorization.PaymentSource,
-		Amount:          authorization.Amount,
+		ID:               transactionID,
+		RequestID:        authorization.RequestID,
+		AuthorizationID:  authorizationID,
+		PaymentSource:    authorization.PaymentSource,
+		Amount:           authorization.Amount,
+		AuthorizedAmount: authorization.Amount,
 		PaymentActionSummary: []*domain.PaymentAction{
 			{
 				Type:          domain.PaymentActionTypeAuthorization,
@@ -157,7 +158,8 @@ func TestService_Void_Success(t *testing.T) {
 
 	gomock.InOrder(
 		store.EXPECT().GetTransaction(gomock.Any(), authorizationID).Return(&mockAuthorizedTransaction, nil).Times(1),
-		store.EXPECT().CreatePaymentAction(gomock.Any(), mockAuthorizedTransaction.ID, voidRequestID, domain.PaymentActionTypeVoid, nil, someDate).Return(nil).Times(1),
+		store.EXPECT().CreatePaymentAction(gomock.Any(), mockAuthorizedTransaction.ID, voidRequestID,
+			domain.PaymentActionTypeVoid, nil, someDate).Return(nil).Times(1),
 		store.EXPECT().GetTransaction(gomock.Any(), authorizationID).Return(&mockVoidedTransaction, nil).Times(1),
 	)
 
@@ -178,7 +180,8 @@ func TestService_Capture_Success(t *testing.T) {
 
 	gomock.InOrder(
 		store.EXPECT().GetTransaction(gomock.Any(), authorizationID).Return(&mockAuthorizedTransaction, nil).Times(1),
-		store.EXPECT().CreatePaymentAction(gomock.Any(), mockAuthorizedTransaction.ID, captureRequestID, domain.PaymentActionTypeCapture, &capture.Amount, someDate).Return(nil).Times(1),
+		store.EXPECT().CreatePaymentAction(gomock.Any(), mockAuthorizedTransaction.ID, captureRequestID,
+			domain.PaymentActionTypeCapture, &capture.Amount, someDate).Return(nil).Times(1),
 		store.EXPECT().GetTransaction(gomock.Any(), authorizationID).Return(&mockVoidedTransaction, nil).Times(1),
 	)
 
@@ -210,5 +213,6 @@ func TestService_Refund_Success(t *testing.T) {
 
 func appendPaymentAction(t domain.Transaction, pa *domain.PaymentAction) domain.Transaction {
 	t.PaymentActionSummary = append(t.PaymentActionSummary, pa)
+	t.Amounts()
 	return t
 }
