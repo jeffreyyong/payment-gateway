@@ -60,7 +60,6 @@ func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
 	m.HandleFunc(EndpointVoid, h.Void).Methods(http.MethodPost)
 }
 
-// TODO: if request ID is the same, tell the client is no op
 func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -103,48 +102,21 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 			Currency:   req.Amount.Currency,
 			Exponent:   req.Amount.Exponent,
 		},
-		Recipient: domain.Recipient{
-			Postcode: req.Recipient.Postcode,
-			LastName: req.Recipient.LastName,
-		},
 	}
 
 	t, err := h.service.Authorize(ctx, authorization)
 	if err != nil {
-		// TODO: do more mapping of errors like not found
 		errMsg := "failed to authorize transaction in service"
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
 	}
 
-	authorizationDate, err := t.AuthorizationDate()
+	transactionRes, err := mapToTransactionResp(t)
 	if err != nil {
-		errMsg := "invalid transaction with no authorization date"
+		errMsg := "error mapping to transaction response"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
-	}
-
-	transactionRes := Transaction{
-		ID:              t.ID,
-		AuthorizationID: t.AuthorizationID,
-		AuthorizedTime:  &authorizationDate,
-		AuthorizedAmount: Amount{
-			MinorUnits: t.AuthorizedAmount.MinorUnits,
-			Exponent:   t.AuthorizedAmount.Exponent,
-			Currency:   t.AuthorizedAmount.Currency,
-		},
-		CapturedAmount: Amount{
-			MinorUnits: t.CapturedAmount.MinorUnits,
-			Exponent:   t.CapturedAmount.Exponent,
-			Currency:   t.CapturedAmount.Currency,
-		},
-		RefundedAmount: Amount{
-			MinorUnits: t.RefundedAmount.MinorUnits,
-			Exponent:   t.RefundedAmount.Exponent,
-			Currency:   t.RefundedAmount.Currency,
-		},
-		IsVoided: t.Voided(),
 	}
 
 	w.Header().Add(ContentType, ApplicationJSON)
@@ -211,34 +183,12 @@ func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	authorizationDate, err := t.AuthorizationDate()
+	transactionRes, err := mapToTransactionResp(t)
 	if err != nil {
-		errMsg := "invalid transaction with no authorization date"
+		errMsg := "error mapping to transaction response"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
-	}
-
-	transactionRes := Transaction{
-		ID:              t.ID,
-		AuthorizationID: t.AuthorizationID,
-		AuthorizedTime:  &authorizationDate,
-		AuthorizedAmount: Amount{
-			MinorUnits: t.AuthorizedAmount.MinorUnits,
-			Exponent:   t.AuthorizedAmount.Exponent,
-			Currency:   t.AuthorizedAmount.Currency,
-		},
-		CapturedAmount: Amount{
-			MinorUnits: t.CapturedAmount.MinorUnits,
-			Exponent:   t.CapturedAmount.Exponent,
-			Currency:   t.CapturedAmount.Currency,
-		},
-		RefundedAmount: Amount{
-			MinorUnits: t.RefundedAmount.MinorUnits,
-			Exponent:   t.RefundedAmount.Exponent,
-			Currency:   t.RefundedAmount.Currency,
-		},
-		IsVoided: t.Voided(),
 	}
 
 	w.Header().Add(ContentType, ApplicationJSON)
@@ -251,7 +201,6 @@ func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO: pull out the parsing of transaction response
 func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -306,34 +255,12 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	authorizationDate, err := t.AuthorizationDate()
+	transactionRes, err := mapToTransactionResp(t)
 	if err != nil {
-		errMsg := "invalid transaction with no authorization date"
+		errMsg := "error mapping to transaction response"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
-	}
-
-	transactionRes := Transaction{
-		ID:              t.ID,
-		AuthorizationID: t.AuthorizationID,
-		AuthorizedTime:  &authorizationDate,
-		AuthorizedAmount: Amount{
-			MinorUnits: t.AuthorizedAmount.MinorUnits,
-			Exponent:   t.AuthorizedAmount.Exponent,
-			Currency:   t.AuthorizedAmount.Currency,
-		},
-		CapturedAmount: Amount{
-			MinorUnits: t.CapturedAmount.MinorUnits,
-			Exponent:   t.CapturedAmount.Exponent,
-			Currency:   t.CapturedAmount.Currency,
-		},
-		RefundedAmount: Amount{
-			MinorUnits: t.RefundedAmount.MinorUnits,
-			Exponent:   t.RefundedAmount.Exponent,
-			Currency:   t.RefundedAmount.Currency,
-		},
-		IsVoided: t.Voided(),
 	}
 
 	w.Header().Add(ContentType, ApplicationJSON)
@@ -346,7 +273,6 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO: pull out the parsing of transaction response
 func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -396,15 +322,31 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	authorizationDate, err := t.AuthorizationDate()
+	transactionRes, err := mapToTransactionResp(t)
 	if err != nil {
-		errMsg := "invalid transaction with no authorization date"
+		errMsg := "error mapping to transaction response"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
 	}
 
-	transactionRes := Transaction{
+	w.Header().Add(ContentType, ApplicationJSON)
+	err = json.NewEncoder(w).Encode(transactionRes)
+	if err != nil {
+		errMsg := "error encoding json response"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+}
+
+func mapToTransactionResp(t *domain.Transaction) (Transaction, error) {
+	authorizationDate, err := t.AuthorizationDate()
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	return Transaction{
 		ID:              t.ID,
 		AuthorizationID: t.AuthorizationID,
 		AuthorizedTime:  &authorizationDate,
@@ -424,14 +366,5 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 			Currency:   t.RefundedAmount.Currency,
 		},
 		IsVoided: t.Voided(),
-	}
-
-	w.Header().Add(ContentType, ApplicationJSON)
-	err = json.NewEncoder(w).Encode(transactionRes)
-	if err != nil {
-		errMsg := "error encoding json response"
-		logging.Error(ctx, errMsg, zap.Error(err))
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
-	}
+	}, nil
 }

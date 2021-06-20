@@ -33,7 +33,6 @@ type Service struct {
 
 // TODO: have to map more unporcessable entity error
 // TODO: do more validation in the service layer
-// TODO: Can transactions be partially authorized?
 func (s *Service) Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error) {
 	const errLogMsg = "unable to authorize transaction"
 	ctx = logging.WithFields(ctx,

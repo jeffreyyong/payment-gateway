@@ -7,7 +7,6 @@ import (
 	uuid "github.com/kevinburke/go.uuid"
 )
 
-// TODO: add more tests in domain
 var (
 	ErrTransactionNotAuthorized = errors.New("transaction not authorized")
 	ErrTransactionNotFound      = errors.New("transaction not found")
@@ -38,13 +37,6 @@ type Authorization struct {
 	RequestID     uuid.UUID
 	PaymentSource PaymentSource
 	Amount        Amount
-	Recipient     Recipient
-}
-
-// Not mandatory
-type Recipient struct {
-	Postcode string
-	LastName string
 }
 
 type Capture struct {

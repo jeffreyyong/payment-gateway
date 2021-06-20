@@ -49,10 +49,6 @@ func TestHandler_Authorize(t *testing.T) {
 				Currency:   "GBP",
 				Exponent:   2,
 			},
-			Recipient: domain.Recipient{
-				Postcode: "SE17 1FZ",
-				LastName: "Yong",
-			},
 		}
 
 		mockTransaction = &domain.Transaction{
@@ -226,7 +222,7 @@ func TestHandler_Authorize(t *testing.T) {
 					m.service.EXPECT().Authorize(gomock.Any(), authorization).Return(mockTransactionWithNoAuthorizationDate, nil)
 				},
 				http.StatusInternalServerError,
-				`{"code":"unknown_failure","message":"invalid transaction with no authorization date"}`,
+				`{"code":"unknown_failure","message":"error mapping to transaction response"}`,
 			},
 		}
 
@@ -435,7 +431,7 @@ func TestHandler_Void(t *testing.T) {
 					m.service.EXPECT().Void(gomock.Any(), void).Return(mockTransactionWithNoAuthorizationDate, nil)
 				},
 				http.StatusInternalServerError,
-				`{"code":"unknown_failure","message":"invalid transaction with no authorization date"}`,
+				`{"code":"unknown_failure","message":"error mapping to transaction response"}`,
 			},
 			{
 				"service returns unprocessable error",

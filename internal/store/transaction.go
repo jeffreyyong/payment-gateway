@@ -12,8 +12,6 @@ import (
 	"github.com/jeffreyyong/payment-gateway/internal/domain"
 )
 
-// TODO: think about idempotency?
-
 // CreateTransaction creates the first ever transaction, it will populate the transaction table, card table and
 // the payment_action table with Authorization type
 func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Authorization, processedDate time.Time) (*domain.Transaction, error) {
@@ -219,9 +217,7 @@ func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (
 			&paymentActionType, &paymentActionStatus, &paymentActionAmount, &paymentActionCurrency, &paymentActionRequestID, &paymentActionProcessedDate); err != nil {
 			return nil, errors.Wrap(err, "get transaction scanning")
 		}
-		// TODO: this can be mapped properly
 		exponent := 2
-
 		var amount *domain.Amount
 		if paymentActionAmount.Valid {
 			amount = &domain.Amount{
