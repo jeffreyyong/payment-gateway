@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/jeffreyyong/payment-gateway/internal/domain"
-	"github.com/jeffreyyong/payment-gateway/internal/transport/transporthttp"
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jeffreyyong/payment-gateway/internal/domain"
+	"github.com/jeffreyyong/payment-gateway/internal/transport/transporthttp"
+	"github.com/jeffreyyong/payment-gateway/internal/transport/transporthttp/mocks"
 )
 
 func TestHandler_Authorize(t *testing.T) {
@@ -157,7 +159,7 @@ func TestHandler_Authorize(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			srv := transporthttp.NewMockService(ctrl)
+			srv := mocks.NewMockService(ctrl)
 			srv.EXPECT().Authorize(gomock.Any(), authorization).Return(mockTransaction, nil)
 
 			h, err := transporthttp.NewHTTPHandler(srv)
@@ -165,7 +167,7 @@ func TestHandler_Authorize(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(
-				http.MethodGet,
+				http.MethodPost,
 				transporthttp.EndpointAuthorize,
 				bytes.NewReader([]byte(validReqBody)),
 			)
@@ -183,14 +185,14 @@ func TestHandler_Authorize(t *testing.T) {
 	})
 
 	t.Run("FAILURE", func(t *testing.T) {
-		type mocks struct {
-			service *transporthttp.MockService
+		type handlerMocks struct {
+			service *mocks.MockService
 		}
 
 		failureCases := []struct {
 			description          string
 			requestBody          io.Reader
-			setupMocks           func(m *mocks)
+			setupMocks           func(m *handlerMocks)
 			expectedStatusCode   int
 			expectedResponseBody string
 		}{
@@ -211,7 +213,7 @@ func TestHandler_Authorize(t *testing.T) {
 			{
 				"service returns error",
 				bytes.NewReader([]byte(validReqBody)),
-				func(m *mocks) {
+				func(m *handlerMocks) {
 					m.service.EXPECT().Authorize(gomock.Any(), authorization).Return(nil, errors.New("kaboom"))
 				},
 				http.StatusInternalServerError,
@@ -220,7 +222,7 @@ func TestHandler_Authorize(t *testing.T) {
 			{
 				"transaction has no authorization date",
 				bytes.NewReader([]byte(validReqBody)),
-				func(m *mocks) {
+				func(m *handlerMocks) {
 					m.service.EXPECT().Authorize(gomock.Any(), authorization).Return(mockTransactionWithNoAuthorizationDate, nil)
 				},
 				http.StatusInternalServerError,
@@ -232,16 +234,16 @@ func TestHandler_Authorize(t *testing.T) {
 			t.Run(tt.description, func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				defer ctrl.Finish()
-				srv := transporthttp.NewMockService(ctrl)
+				srv := mocks.NewMockService(ctrl)
 
-				m := mocks{service: srv}
+				m := handlerMocks{service: srv}
 				if tt.setupMocks != nil {
 					tt.setupMocks(&m)
 				}
 
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest(
-					http.MethodGet,
+					http.MethodPost,
 					transporthttp.EndpointAuthorize,
 					tt.requestBody,
 				)
@@ -250,6 +252,217 @@ func TestHandler_Authorize(t *testing.T) {
 				require.NoError(t, err)
 
 				h.Authorize(w, r)
+				res := w.Result()
+				defer res.Body.Close()
+				assert.Equal(t, tt.expectedStatusCode, res.StatusCode)
+				assert.Equal(t, transporthttp.ApplicationJSON, res.Header.Get(transporthttp.ContentType))
+
+				respBody, err := ioutil.ReadAll(res.Body)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResponseBody, strings.TrimSuffix(string(respBody), "\n"))
+			})
+		}
+	})
+}
+
+func TestHandler_Capture(t *testing.T) {
+	captureRequestID, _ := uuid.FromString("cf533318-ed57-411e-be6a-f74b032d594f")
+	someAuthorizationID, _ := uuid.FromString("f71d1314-2fbb-44cc-ba27-527c6682e3a5")
+	var (
+		requestID             = uuid.NewV4()
+		transactionMinorUnits = uint64(10555)
+		captureMinorUnits     = uint64(5555)
+		mockTransactionID     = uuid.NewV4()
+		mockAuthorizationID   = uuid.NewV4()
+		authorizationDate     = time.Date(2021, 06, 18, 12, 31, 0, 0, time.UTC)
+		captureDate           = authorizationDate.Add(1 * time.Hour)
+
+		capture = &domain.Capture{
+			RequestID:       captureRequestID,
+			AuthorizationID: someAuthorizationID,
+			Amount: domain.Amount{
+				MinorUnits: captureMinorUnits,
+				Currency:   "GBP",
+				Exponent:   2,
+			},
+		}
+
+		mockTransaction = &domain.Transaction{
+			ID:              mockTransactionID,
+			RequestID:       requestID,
+			AuthorizationID: mockAuthorizationID,
+			AuthorizedAmount: domain.Amount{
+				MinorUnits: transactionMinorUnits,
+				Currency:   "GBP",
+				Exponent:   2,
+			},
+			CapturedAmount: domain.Amount{
+				MinorUnits: captureMinorUnits,
+				Currency:   "GBP",
+				Exponent:   2,
+			},
+			RefundedAmount: domain.Amount{
+				MinorUnits: 0,
+				Currency:   "GBP",
+				Exponent:   2,
+			},
+			PaymentActionSummary: []*domain.PaymentAction{
+				{
+					Type:          domain.PaymentActionTypeAuthorization,
+					Status:        domain.PaymentActionStatusSuccess,
+					ProcessedDate: authorizationDate,
+					Amount: &domain.Amount{
+						MinorUnits: transactionMinorUnits,
+						Currency:   "GBP",
+						Exponent:   2,
+					},
+					RequestID: requestID,
+				},
+				{
+					Type:          domain.PaymentActionTypeCapture,
+					Status:        domain.PaymentActionStatusSuccess,
+					ProcessedDate: captureDate,
+					Amount: &domain.Amount{
+						MinorUnits: captureMinorUnits,
+						Currency:   "GBP",
+						Exponent:   2,
+					},
+					RequestID: captureRequestID,
+				},
+			},
+		}
+
+		validReqBody = `
+			{
+				"request_id": "cf533318-ed57-411e-be6a-f74b032d594f",
+				"amount": {
+					"minor_units": 5555,
+					"currency": "GBP",
+					"exponent": 2
+				},
+				"authorization_id": "f71d1314-2fbb-44cc-ba27-527c6682e3a5"
+			}`
+
+		expectedTransactionResp = transporthttp.Transaction{
+			ID:              mockTransactionID,
+			AuthorizationID: mockAuthorizationID,
+			AuthorizedTime:  &authorizationDate,
+			AuthorizedAmount: transporthttp.Amount{
+				MinorUnits: mockTransaction.AuthorizedAmount.MinorUnits,
+				Exponent:   mockTransaction.AuthorizedAmount.Exponent,
+				Currency:   mockTransaction.AuthorizedAmount.Currency,
+			},
+			CapturedAmount: transporthttp.Amount{
+				MinorUnits: mockTransaction.CapturedAmount.MinorUnits,
+				Exponent:   mockTransaction.CapturedAmount.Exponent,
+				Currency:   mockTransaction.CapturedAmount.Currency,
+			},
+			RefundedAmount: transporthttp.Amount{
+				MinorUnits: mockTransaction.RefundedAmount.MinorUnits,
+				Exponent:   mockTransaction.RefundedAmount.Exponent,
+				Currency:   mockTransaction.RefundedAmount.Currency,
+			},
+			IsVoided: false,
+		}
+	)
+	t.Run("SUCCESS", func(t *testing.T) {
+		t.Run("should capture the transaction, return status code 200", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			srv := mocks.NewMockService(ctrl)
+			srv.EXPECT().Capture(gomock.Any(), capture).Return(mockTransaction, nil)
+
+			h, err := transporthttp.NewHTTPHandler(srv)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(
+				http.MethodPost,
+				transporthttp.EndpointCapture,
+				bytes.NewReader([]byte(validReqBody)),
+			)
+
+			h.Capture(w, r)
+			res := w.Result()
+			defer res.Body.Close()
+			assert.Equal(t, http.StatusOK, res.StatusCode)
+			assert.Equal(t, transporthttp.ApplicationJSON, res.Header.Get(transporthttp.ContentType))
+
+			var out transporthttp.Transaction
+			require.NoError(t, json.NewDecoder(res.Body).Decode(&out))
+			assert.Equal(t, expectedTransactionResp, out)
+		})
+	})
+
+	t.Run("FAILURE", func(t *testing.T) {
+		type handlerMocks struct {
+			service *mocks.MockService
+		}
+
+		failureCases := []struct {
+			description          string
+			requestBody          io.Reader
+			setupMocks           func(m *handlerMocks)
+			expectedStatusCode   int
+			expectedResponseBody string
+		}{
+			{
+				"no request body is provided",
+				nil,
+				nil,
+				http.StatusBadRequest,
+				`{"code":"bad_request","message":"missing request body"}`,
+			},
+			{
+				"malformed json request body",
+				bytes.NewReader([]byte(`{`)),
+				nil,
+				http.StatusBadRequest,
+				`{"code":"bad_request","message":"failed to unmarshal request body"}`,
+			},
+			{
+				"service returns error",
+				bytes.NewReader([]byte(validReqBody)),
+				func(m *handlerMocks) {
+					m.service.EXPECT().Capture(gomock.Any(), capture).Return(nil, errors.New("kaboom"))
+				},
+				http.StatusInternalServerError,
+				`{"code":"unknown_failure","message":"failed to capture transaction in service"}`,
+			},
+			{
+				"service returns transaction not found",
+				bytes.NewReader([]byte(validReqBody)),
+				func(m *handlerMocks) {
+					m.service.EXPECT().Capture(gomock.Any(), capture).Return(nil, domain.ErrTransactionNotFound)
+				},
+				http.StatusNotFound,
+				`{"code":"not_found","message":"unable to find the transaction with the authorization ID"}`,
+			},
+		}
+
+		for _, tt := range failureCases {
+			t.Run(tt.description, func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				defer ctrl.Finish()
+				srv := mocks.NewMockService(ctrl)
+
+				m := handlerMocks{service: srv}
+				if tt.setupMocks != nil {
+					tt.setupMocks(&m)
+				}
+
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest(
+					http.MethodPost,
+					transporthttp.EndpointCapture,
+					tt.requestBody,
+				)
+
+				h, err := transporthttp.NewHTTPHandler(srv)
+				require.NoError(t, err)
+
+				h.Capture(w, r)
 				res := w.Result()
 				defer res.Body.Close()
 				assert.Equal(t, tt.expectedStatusCode, res.StatusCode)

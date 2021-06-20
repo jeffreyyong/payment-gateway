@@ -1,4 +1,4 @@
-//go:generate mockgen -package http -self_package github.com/jeffreyyong/payment-gateway/internal/transport/http -destination handler_mock.go github.com/jeffreyyong/payment-gateway/internal/transport/http Service
+//go:generate mockgen -destination=./mocks/handler_mock.go -package=mocks github.com/jeffreyyong/payment-gateway/internal/transport/transporthttp Service
 
 package transporthttp
 
@@ -10,15 +10,16 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/jeffreyyong/payment-gateway/internal/logging"
 	"go.uber.org/zap"
 
 	"github.com/jeffreyyong/payment-gateway/internal/app/listeners/httplistener"
 	"github.com/jeffreyyong/payment-gateway/internal/domain"
+	"github.com/jeffreyyong/payment-gateway/internal/logging"
 )
 
 const (
 	EndpointAuthorize = "/authorize"
+	EndpointCapture   = "/capture"
 
 	ContentType     = "Content-Type"
 	ApplicationJSON = "application/json"
@@ -27,6 +28,7 @@ const (
 // Service represents an interface for a service layer allowing HTTP routing logic and business logic to be separated
 type Service interface {
 	Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error)
+	Capture(ctx context.Context, capture *domain.Capture) (*domain.Transaction, error)
 }
 
 // httpHandler is the http handler that will enable
@@ -49,10 +51,7 @@ func NewHTTPHandler(service Service) (*httpHandler, error) {
 // ApplyRoutes will link the HTTP REST endpoint to the corresponding function in this handler
 func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
 	m.HandleFunc(EndpointAuthorize, h.Authorize).Methods(http.MethodPost)
-}
-
-func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	m.HandleFunc(EndpointCapture, h.Capture).Methods(http.MethodPost)
 }
 
 // TODO: if request ID is the same, tell the client is no op
@@ -108,7 +107,95 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// TODO: do more mapping of errors like not found
 		errMsg := "failed to authorize transaction in service"
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+
+	authorizationDate, err := t.AuthorizationDate()
+	if err != nil {
+		errMsg := "invalid transaction with no authorization date"
 		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+
+	transactionRes := Transaction{
+		ID:              t.ID,
+		AuthorizationID: t.AuthorizationID,
+		AuthorizedTime:  &authorizationDate,
+		AuthorizedAmount: Amount{
+			MinorUnits: t.AuthorizedAmount.MinorUnits,
+			Exponent:   t.AuthorizedAmount.Exponent,
+			Currency:   t.AuthorizedAmount.Currency,
+		},
+		CapturedAmount: Amount{
+			MinorUnits: t.CapturedAmount.MinorUnits,
+			Exponent:   t.CapturedAmount.Exponent,
+			Currency:   t.CapturedAmount.Currency,
+		},
+		RefundedAmount: Amount{
+			MinorUnits: t.RefundedAmount.MinorUnits,
+			Exponent:   t.RefundedAmount.Exponent,
+			Currency:   t.RefundedAmount.Currency,
+		},
+		IsVoided: t.Voided(),
+	}
+
+	w.Header().Add(ContentType, ApplicationJSON)
+	err = json.NewEncoder(w).Encode(transactionRes)
+	if err != nil {
+		errMsg := "error encoding json response"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeUnknownFailure)
+		return
+	}
+}
+
+func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		errMsg := "error reading request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if len(body) == 0 {
+		errMsg := "missing request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	var req CaptureRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	capture := &domain.Capture{
+		RequestID:       req.RequestID,
+		AuthorizationID: req.AuthorizationID,
+		Amount: domain.Amount{
+			MinorUnits: req.Amount.MinorUnits,
+			Currency:   req.Amount.Currency,
+			Exponent:   req.Amount.Exponent,
+		},
+	}
+
+	t, err := h.service.Capture(ctx, capture)
+	if err != nil {
+		if errors.Is(err, domain.ErrTransactionNotFound) {
+			errMsg := "unable to find the transaction with the authorization ID"
+			_ = WriteError(w, errMsg, CodeNotFound)
+			return
+		}
+		errMsg := "failed to capture transaction in service"
 		_ = WriteError(w, errMsg, CodeUnknownFailure)
 		return
 	}

@@ -6,17 +6,19 @@ import (
 	uuid "github.com/kevinburke/go.uuid"
 )
 
-const (
-	DateOfBirthDateFormat = "2006-01-02"
-)
-
 // Do validation on http domain
 type AuthorizeRequest struct {
 	PaymentSource PaymentSource `json:"payment_source"`
 	Amount        Amount        `json:"amount"`
 	RequestID     uuid.UUID     `json:"request_id"`
 	Description   string        `json:"description"`
-	Recipient     *Recipient    `json:"recipient,omitempty"`
+	Recipient     Recipient     `json:"recipient,omitempty"`
+}
+
+type CaptureRequest struct {
+	AuthorizationID uuid.UUID `json:"authorization_id"`
+	RequestID       uuid.UUID `json:"request_id"`
+	Amount          Amount    `json:"amount"`
 }
 
 type Recipient struct {

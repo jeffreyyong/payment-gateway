@@ -132,6 +132,15 @@ func (t Transaction) AuthorizationDate() (time.Time, error) {
 	return time.Time{}, errors.New("transaction missing authorization date")
 }
 
+func (t Transaction) IsRequestIDIdempotent(pat PaymentActionType, requestID uuid.UUID) bool {
+	for _, pa := range t.PaymentActionSummary {
+		if pa.Type == pat && pa.RequestID == requestID {
+			return true
+		}
+	}
+	return false
+}
+
 func (t Transaction) Voided() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.VoidSuccess() {

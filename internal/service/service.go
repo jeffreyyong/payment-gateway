@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/golang/mock/mockgen/model"
 	"github.com/jonboulle/clockwork"
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/pkg/errors"
@@ -63,6 +62,12 @@ func (s *Service) Void(ctx context.Context, void *domain.Void) (*domain.Transact
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
 	}
+
+	if transaction.IsRequestIDIdempotent(domain.PaymentActionTypeVoid, void.RequestID) {
+		logging.Print(ctx, "request is idempotent hence no op")
+		return transaction, nil
+	}
+
 	if transaction.Voided() {
 		err = errors.Wrap(err, "transaction is already voided")
 		logging.Error(ctx, errLogMsg, zap.Error(err))
@@ -102,6 +107,11 @@ func (s *Service) Capture(ctx context.Context, capture *domain.Capture) (*domain
 		return nil, err
 	}
 
+	if transaction.IsRequestIDIdempotent(domain.PaymentActionTypeCapture, capture.RequestID) {
+		logging.Print(ctx, "request is idempotent hence no op")
+		return transaction, nil
+	}
+
 	if err = transaction.ValidateCapture(capture.Amount); err != nil {
 		err = errors.Wrap(err, "transaction cannot be captured")
 		logging.Error(ctx, errLogMsg, zap.Error(err))
@@ -137,6 +147,11 @@ func (s *Service) Refund(ctx context.Context, refund *domain.Refund) (*domain.Tr
 		err = errors.Wrap(err, "unable to get transaction from store")
 		logging.Error(ctx, errLogMsg, zap.Error(err))
 		return nil, err
+	}
+
+	if transaction.IsRequestIDIdempotent(domain.PaymentActionTypeRefund, refund.RequestID) {
+		logging.Print(ctx, "request is idempotent hence no op")
+		return transaction, nil
 	}
 
 	if err = transaction.ValidateRefund(refund.Amount); err != nil {

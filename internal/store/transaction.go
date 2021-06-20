@@ -24,9 +24,10 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		stmtPaymentActionInsert *sql.Stmt
 		err                     error
 
-		cardID          uuid.UUID
-		transactionID   uuid.UUID
-		paymentActionID uuid.UUID
+		cardID            uuid.UUID
+		transactionID     uuid.UUID
+		paymentActionID   uuid.UUID
+		authorizationDate sql.NullTime
 	)
 
 	tx, err = s.Begin()
@@ -87,7 +88,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		on conflict (request_id)
 		do update set request_id = excluded.request_id
-		returning id
+		returning id, created_date
 	`)
 	if err != nil {
 		return nil, errors.Wrap(err, "prepare insert payment action statement")
@@ -98,14 +99,14 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		QueryRowContext(ctx, authorizationID, domain.PaymentActionTypeAuthorization,
 			domain.PaymentActionStatusSuccess, authorization.Amount.MinorUnits, authorization.Amount.Currency,
 			authorization.RequestID, transactionID, processedDate, processedDate).
-		Scan(&paymentActionID); err != nil {
+		Scan(&paymentActionID, &authorizationDate); err != nil {
 		return nil, errors.Wrap(err, "execute insert payment action statement")
 	}
 
 	paymentAction := &domain.PaymentAction{
 		Type:          domain.PaymentActionTypeAuthorization,
 		Status:        domain.PaymentActionStatusSuccess,
-		ProcessedDate: processedDate,
+		ProcessedDate: authorizationDate.Time,
 		Amount:        &authorization.Amount,
 		RequestID:     authorization.RequestID,
 	}

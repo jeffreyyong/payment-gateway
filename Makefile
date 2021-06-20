@@ -52,7 +52,7 @@ cover:
 	go tool cover -html=coverage.out
 
 generate: get-generator
-	go generate -x ./...
+	go generate -x ./... --build_flags=--mod=mod
 
 get-generator:
 	go install github.com/golang/mock/mockgen@v1.6.0
