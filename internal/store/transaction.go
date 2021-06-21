@@ -175,7 +175,7 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 		}
 	}()
 
-	row := s.QueryRowContext(ctx, `select c.pan from transaction t join card c on t.card_id = c.id where transaction.id = $1;`, transactionID)
+	row := s.QueryRowContext(ctx, `select card.pan from card join transaction  on transaction.card_id = card.id where transaction.id = $1;`, transactionID)
 	err = row.Scan(&transactionPAN)
 	if err != nil {
 		return errors.Wrap(err, "query pan from card table")
@@ -202,7 +202,7 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 
 	paymentActionStatus := domain.PaymentActionStatusSuccess
 	if pan, ok := panFailureMap[paymentActionType]; ok {
-		if pan == transactionPAN.String {
+		if strings.ReplaceAll(pan, " ", "") == transactionPAN.String {
 			paymentActionStatus = domain.PaymentActionStatusFailed
 		}
 	}
