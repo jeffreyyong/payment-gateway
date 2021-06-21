@@ -19,7 +19,8 @@ type FileProvider struct {
 
 // Config variables for the application
 type Config struct {
-	PostgresDSN string `yaml:"POSTGRES_DSN"`
+	PostgresDSN      string            `yaml:"POSTGRES_DSN"`
+	PrivilegedTokens map[string]string `yaml:"privileged_tokens"`
 }
 
 // Load loads the configuration for the application.

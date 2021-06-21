@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
 	"github.com/jeffreyyong/payment-gateway/internal/app/listeners/httplistener"
@@ -38,18 +39,24 @@ type Service interface {
 // httpHandler is the http handler that will enable
 // calls to this service via HTTP REST
 type httpHandler struct {
-	service Service
+	service         Service
+	middlewareFuncs []mux.MiddlewareFunc
 }
 
 // NewHTTPHandler will create a new instance of httpHandler
-func NewHTTPHandler(service Service) (*httpHandler, error) {
+func NewHTTPHandler(service Service, opts ...MiddlewareFunc) (*httpHandler, error) {
 	if service == nil {
 		return nil, fmt.Errorf("%w: service", errors.New("some error"))
 	}
 
-	return &httpHandler{
-		service: service,
-	}, nil
+	h := &httpHandler{service: service}
+	for _, opt := range opts {
+		if err := opt(h); err != nil {
+			return nil, err
+		}
+	}
+
+	return h, nil
 }
 
 // ApplyRoutes will link the HTTP REST endpoint to the corresponding function in this handler
@@ -58,6 +65,7 @@ func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
 	m.HandleFunc(EndpointCapture, h.Capture).Methods(http.MethodPost)
 	m.HandleFunc(EndpointRefund, h.Refund).Methods(http.MethodPost)
 	m.HandleFunc(EndpointVoid, h.Void).Methods(http.MethodPost)
+	m.Use(h.middlewareFuncs...)
 }
 
 func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {

@@ -68,7 +68,7 @@ func setup(ctx context.Context, s *app.Service) ([]app.Listener, context.Context
 		return nil, ctx, err
 	}
 
-	h, err := transporthttp.NewHTTPHandler(svc)
+	h, err := transporthttp.NewHTTPHandler(svc, transporthttp.WithAuth(cfg.PrivilegedTokens))
 	if err != nil {
 		logging.Error(ctx, "creating_http_handler", zap.Error(err))
 		return nil, ctx, err
