@@ -8,7 +8,7 @@ import (
 func Validate(pan string) error {
 	panNum, err := strconv.Atoi(pan)
 	if err != nil {
-		return errors.New("pan contains non numeric")
+		return errors.New("pan contains non numeric or spaces")
 	}
 
 	var luhn int

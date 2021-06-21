@@ -4,12 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/pkg/errors"
 
 	"github.com/jeffreyyong/payment-gateway/internal/domain"
+)
+
+const (
+	authorisationFailurePAN = "4000 0000 0000 0119"
+	captureFailurePAN       = "4000 0000 0000 0259"
+	refundFailurePAN        = "4000 0000 0000 3238"
+)
+
+var (
+	panFailureMap = map[domain.PaymentActionType]string{
+		domain.PaymentActionTypeCapture: captureFailurePAN,
+		domain.PaymentActionTypeRefund:  refundFailurePAN,
+	}
 )
 
 // CreateTransaction creates the first ever transaction, it will populate the transaction table, card table and
@@ -53,8 +67,9 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 	defer stmtCardInsert.Close()
 
 	ps := authorization.PaymentSource
+	pan := strings.ReplaceAll(ps.PAN, " ", "")
 	if err = stmtCardInsert.
-		QueryRowContext(ctx, ps.PAN, ps.CVV, strconv.Itoa(ps.Expiry.Month), strconv.Itoa(ps.Expiry.Year), processedDate, processedDate).
+		QueryRowContext(ctx, pan, ps.CVV, strconv.Itoa(ps.Expiry.Month), strconv.Itoa(ps.Expiry.Year), processedDate, processedDate).
 		Scan(&cardID); err != nil {
 		return nil, errors.Wrap(err, "execute insert card statement")
 	}
@@ -80,6 +95,11 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 		return nil, errors.Wrap(err, "execute insert authorization statement")
 	}
 
+	status := domain.PaymentActionStatusSuccess
+	if pan == strings.ReplaceAll(authorisationFailurePAN, " ", "") {
+		status = domain.PaymentActionStatusFailed
+	}
+
 	// insert payment action
 	stmtPaymentActionInsert, err = tx.PrepareContext(ctx, `
 		insert into payment_action (id, type, status, amount, currency, request_id, transaction_id, created_date, updated_date)
@@ -95,7 +115,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 
 	if err = stmtPaymentActionInsert.
 		QueryRowContext(ctx, authorizationID, domain.PaymentActionTypeAuthorization,
-			domain.PaymentActionStatusSuccess, authorization.Amount.MinorUnits, authorization.Amount.Currency,
+			status, authorization.Amount.MinorUnits, authorization.Amount.Currency,
 			authorization.RequestID, transactionID, processedDate, processedDate).
 		Scan(&paymentActionID, &authorizationDate); err != nil {
 		return nil, errors.Wrap(err, "execute insert payment action statement")
@@ -103,7 +123,7 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 
 	paymentAction := &domain.PaymentAction{
 		Type:          domain.PaymentActionTypeAuthorization,
-		Status:        domain.PaymentActionStatusSuccess,
+		Status:        status,
 		ProcessedDate: authorizationDate.Time,
 		Amount:        &authorization.Amount,
 		RequestID:     authorization.RequestID,
@@ -137,6 +157,7 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 		err                     error
 
 		paymentActionID uuid.UUID
+		transactionPAN  sql.NullString
 	)
 
 	tx, err = s.Begin()
@@ -149,6 +170,12 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 			_ = tx.Rollback()
 		}
 	}()
+
+	row := s.QueryRowContext(ctx, `select c.pan from transaction t join card c on t.card_id = c.id where transaction.id = $1;`, transactionID)
+	err = row.Scan(&transactionPAN)
+	if err != nil {
+		return errors.Wrap(err, "query pan from card table")
+	}
 
 	// insert payment action
 	stmtPaymentActionInsert, err = tx.PrepareContext(ctx, `
@@ -169,9 +196,16 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 		currency = amount.Currency
 	}
 
+	paymentActionStatus := domain.PaymentActionStatusSuccess
+	if pan, ok := panFailureMap[paymentActionType]; ok {
+		if pan == transactionPAN.String {
+			paymentActionStatus = domain.PaymentActionStatusFailed
+		}
+	}
+
 	if err = stmtPaymentActionInsert.
 		QueryRowContext(ctx, paymentActionType,
-			domain.PaymentActionStatusSuccess, minorUnits, currency,
+			paymentActionStatus, minorUnits, currency,
 			requestID, transactionID, processedDate, processedDate).
 		Scan(&paymentActionID); err != nil {
 		return errors.Wrap(err, "execute insert payment action statement")

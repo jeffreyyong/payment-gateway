@@ -1,7 +1,6 @@
 package luhn_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/jeffreyyong/payment-gateway/internal/luhn"
@@ -31,7 +30,7 @@ func TestValidator_Validate(t *testing.T) {
 			"contains alphabet",
 			"ab1ldaf716",
 			true,
-			"pan contains non numeric",
+			"pan contains non numeric or spaces",
 		},
 		{
 			"valid",
@@ -50,7 +49,6 @@ func TestValidator_Validate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			err := luhn.Validate(tc.pan)
-			fmt.Println(err)
 			if tc.expectedErr {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 			} else {

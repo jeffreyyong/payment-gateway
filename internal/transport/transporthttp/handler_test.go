@@ -85,28 +85,6 @@ func TestHandler_Authorize(t *testing.T) {
 			},
 		}
 
-		mockTransactionWithNoAuthorizationDate = &domain.Transaction{
-			ID:              mockTransactionID,
-			RequestID:       requestID,
-			AuthorizationID: mockAuthorizationID,
-			AuthorizedAmount: domain.Amount{
-				MinorUnits: transactionMinorUnits,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			CapturedAmount: domain.Amount{
-				MinorUnits: 0,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			RefundedAmount: domain.Amount{
-				MinorUnits: 0,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			PaymentActionSummary: []*domain.PaymentAction{},
-		}
-
 		validReqBody = `
 	{
 		"request_id": "79fec15e-a3ea-49b8-989d-6a9ceac77d06",
@@ -215,15 +193,6 @@ func TestHandler_Authorize(t *testing.T) {
 				http.StatusInternalServerError,
 				`{"code":"unknown_failure","message":"failed to authorize transaction in service"}`,
 			},
-			{
-				"transaction has no authorization date",
-				bytes.NewReader([]byte(validReqBody)),
-				func(m *handlerMocks) {
-					m.service.EXPECT().Authorize(gomock.Any(), authorization).Return(mockTransactionWithNoAuthorizationDate, nil)
-				},
-				http.StatusInternalServerError,
-				`{"code":"unknown_failure","message":"error mapping to transaction response"}`,
-			},
 		}
 
 		for _, tt := range failureCases {
@@ -307,28 +276,6 @@ func TestHandler_Void(t *testing.T) {
 					RequestID: requestID,
 				},
 			},
-		}
-
-		mockTransactionWithNoAuthorizationDate = &domain.Transaction{
-			ID:              mockTransactionID,
-			RequestID:       requestID,
-			AuthorizationID: mockAuthorizationID,
-			AuthorizedAmount: domain.Amount{
-				MinorUnits: transactionMinorUnits,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			CapturedAmount: domain.Amount{
-				MinorUnits: 0,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			RefundedAmount: domain.Amount{
-				MinorUnits: 0,
-				Currency:   "GBP",
-				Exponent:   2,
-			},
-			PaymentActionSummary: []*domain.PaymentAction{},
 		}
 
 		validReqBody = `
@@ -423,15 +370,6 @@ func TestHandler_Void(t *testing.T) {
 				},
 				http.StatusInternalServerError,
 				`{"code":"unknown_failure","message":"failed to void transaction in service"}`,
-			},
-			{
-				"transaction has no authorization date",
-				bytes.NewReader([]byte(validReqBody)),
-				func(m *handlerMocks) {
-					m.service.EXPECT().Void(gomock.Any(), void).Return(mockTransactionWithNoAuthorizationDate, nil)
-				},
-				http.StatusInternalServerError,
-				`{"code":"unknown_failure","message":"error mapping to transaction response"}`,
 			},
 			{
 				"service returns unprocessable error",

@@ -117,16 +117,8 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	transactionRes, err := mapToTransactionResp(t)
-	if err != nil {
-		errMsg := "error mapping to transaction response"
-		logging.Error(ctx, errMsg, zap.Error(err))
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
-	}
-
 	w.Header().Add(ContentType, ApplicationJSON)
-	err = json.NewEncoder(w).Encode(transactionRes)
+	err = json.NewEncoder(w).Encode(mapToTransactionResp(t))
 	if err != nil {
 		errMsg := "error encoding json response"
 		logging.Error(ctx, errMsg, zap.Error(err))
@@ -189,16 +181,8 @@ func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	transactionRes, err := mapToTransactionResp(t)
-	if err != nil {
-		errMsg := "error mapping to transaction response"
-		logging.Error(ctx, errMsg, zap.Error(err))
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
-	}
-
 	w.Header().Add(ContentType, ApplicationJSON)
-	err = json.NewEncoder(w).Encode(transactionRes)
+	err = json.NewEncoder(w).Encode(mapToTransactionResp(t))
 	if err != nil {
 		errMsg := "error encoding json response"
 		logging.Error(ctx, errMsg, zap.Error(err))
@@ -261,16 +245,8 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	transactionRes, err := mapToTransactionResp(t)
-	if err != nil {
-		errMsg := "error mapping to transaction response"
-		logging.Error(ctx, errMsg, zap.Error(err))
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
-	}
-
 	w.Header().Add(ContentType, ApplicationJSON)
-	err = json.NewEncoder(w).Encode(transactionRes)
+	err = json.NewEncoder(w).Encode(mapToTransactionResp(t))
 	if err != nil {
 		errMsg := "error encoding json response"
 		logging.Error(ctx, errMsg, zap.Error(err))
@@ -328,16 +304,8 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	transactionRes, err := mapToTransactionResp(t)
-	if err != nil {
-		errMsg := "error mapping to transaction response"
-		logging.Error(ctx, errMsg, zap.Error(err))
-		_ = WriteError(w, errMsg, CodeUnknownFailure)
-		return
-	}
-
 	w.Header().Add(ContentType, ApplicationJSON)
-	err = json.NewEncoder(w).Encode(transactionRes)
+	err = json.NewEncoder(w).Encode(mapToTransactionResp(t))
 	if err != nil {
 		errMsg := "error encoding json response"
 		logging.Error(ctx, errMsg, zap.Error(err))
@@ -346,16 +314,11 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func mapToTransactionResp(t *domain.Transaction) (Transaction, error) {
-	authorizationDate, err := t.AuthorizationDate()
-	if err != nil {
-		return Transaction{}, err
-	}
-
+func mapToTransactionResp(t *domain.Transaction) Transaction {
 	return Transaction{
 		ID:              t.ID,
 		AuthorizationID: t.AuthorizationID,
-		AuthorizedTime:  &authorizationDate,
+		AuthorizedTime:  t.AuthorizationDate(),
 		AuthorizedAmount: Amount{
 			MinorUnits: t.AuthorizedAmount.MinorUnits,
 			Exponent:   t.AuthorizedAmount.Exponent,
@@ -372,5 +335,5 @@ func mapToTransactionResp(t *domain.Transaction) (Transaction, error) {
 			Currency:   t.RefundedAmount.Currency,
 		},
 		IsVoided: t.Voided(),
-	}, nil
+	}
 }

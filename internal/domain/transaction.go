@@ -42,13 +42,13 @@ type Transaction struct {
 	PaymentActionSummary []*PaymentAction
 }
 
-func (t Transaction) AuthorizationDate() (time.Time, error) {
+func (t Transaction) AuthorizationDate() *time.Time {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.AuthorizationSuccess() {
-			return pa.ProcessedDate, nil
+			return &pa.ProcessedDate
 		}
 	}
-	return time.Time{}, errors.New("transaction missing authorization date")
+	return nil
 }
 
 func (t Transaction) IsRequestIDIdempotent(pat PaymentActionType, requestID uuid.UUID) bool {
