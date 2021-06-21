@@ -8,28 +8,35 @@ import (
 )
 
 var (
-	ErrTransactionNotAuthorized = errors.New("transaction not authorized")
-	ErrTransactionNotFound      = errors.New("transaction not found")
-	ErrUnprocessable            = errors.New("unprocessable")
+	// ErrTransactionNotFound indicates that the transaction is not found in the db.
+	ErrTransactionNotFound = errors.New("transaction not found")
+	// ErrUnprocessable indicates that the request is unprocessable, e.g. due to the wrong state of the transaction.
+	ErrUnprocessable = errors.New("unprocessable")
 )
 
+// Amount is the canonical amount domain.
 type Amount struct {
 	MinorUnits uint64
 	Currency   string
 	Exponent   uint8
 }
 
+// PaymentSource is the payment source that the client making payment with.
 type PaymentSource struct {
 	PAN    string
 	CVV    string
 	Expiry Expiry
 }
 
+// Expiry date of the payment source.
 type Expiry struct {
 	Month int
 	Year  int
 }
 
+// Transaction is the transaction domain struct.
+// It also contains PaymentActionSummary to show all the PaymentAction that has
+// happened to the transaction so far.
 type Transaction struct {
 	ID                   uuid.UUID
 	RequestID            uuid.UUID
@@ -42,6 +49,9 @@ type Transaction struct {
 	PaymentActionSummary []*PaymentAction
 }
 
+// AuthorizationDate returns the date when the transaction
+// has been authorized successfully, else returns nil.
+// Assumption is there is only one Authorization per Transaction on creation.
 func (t Transaction) AuthorizationDate() *time.Time {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.AuthorizationSuccess() {
@@ -51,6 +61,8 @@ func (t Transaction) AuthorizationDate() *time.Time {
 	return nil
 }
 
+// IsRequestIDIdempotent checks if the requestID is already been used for a particular
+// PaymentActionType and normally will trigger a no op for idempotency.
 func (t Transaction) IsRequestIDIdempotent(pat PaymentActionType, requestID uuid.UUID) bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.Type == pat && pa.RequestID == requestID {
@@ -60,6 +72,7 @@ func (t Transaction) IsRequestIDIdempotent(pat PaymentActionType, requestID uuid
 	return false
 }
 
+// Voided indicates that the transaction has been voided successfully.
 func (t Transaction) Voided() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.VoidSuccess() {
@@ -69,6 +82,7 @@ func (t Transaction) Voided() bool {
 	return false
 }
 
+// Refunded indicates that the transaction has been refunded successfully at least once before.
 func (t Transaction) Refunded() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.RefundSuccess() {
@@ -78,6 +92,7 @@ func (t Transaction) Refunded() bool {
 	return false
 }
 
+// Captured indicates that the transaction has been captured  successfully at least once before.
 func (t Transaction) Captured() bool {
 	for _, pa := range t.PaymentActionSummary {
 		if pa.CaptureSuccess() {
@@ -87,15 +102,9 @@ func (t Transaction) Captured() bool {
 	return false
 }
 
-func (t Transaction) HasPaymentAction(pat PaymentActionType) bool {
-	for _, pa := range t.PaymentActionSummary {
-		if pa.Type == pat && pa.Status == PaymentActionStatusSuccess {
-			return true
-		}
-	}
-	return false
-}
-
+// Amounts calculates the main amounts e.g. authorized, captured and refunded amounts
+// based on the PaymentActionSummary.
+// This is normally called after PaymentActionSummary has been populated.
 func (t *Transaction) Amounts() {
 	var authorized, captured, refunded uint64
 	for _, pa := range t.PaymentActionSummary {
@@ -131,6 +140,9 @@ func (t *Transaction) Amounts() {
 	}
 }
 
+// ValidateCapture rejects if a transaction has been Voided or Refunded before,
+// checks the currency is the same and
+// rejects if the amount the be captured is greater than the authorized amount.
 func (t Transaction) ValidateCapture(a Amount) error {
 	if t.Voided() {
 		return errors.New("transaction is already voided")
@@ -150,6 +162,9 @@ func (t Transaction) ValidateCapture(a Amount) error {
 	return nil
 }
 
+// ValidateRefund rejects if a transaction has been Voided before,
+// checks the currency is the same and
+// rejects if the amount the be refunded is greater than the captured amount.
 func (t Transaction) ValidateRefund(a Amount) error {
 	if t.Voided() {
 		return errors.New("transaction is already voided")
@@ -165,6 +180,7 @@ func (t Transaction) ValidateRefund(a Amount) error {
 	return nil
 }
 
+// ValidateVoid rejects if a transaction has been Voided and Captured before.
 func (t Transaction) ValidateVoid() error {
 	if t.Voided() {
 		return errors.New("transaction is already voided")

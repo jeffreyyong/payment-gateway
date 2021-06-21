@@ -27,7 +27,9 @@ var (
 )
 
 // CreateTransaction creates the first ever transaction, it will populate the transaction table, card table and
-// the payment_action table with Authorization type
+// the payment_action table with Authorization type and returns the transaction.
+// All authorization will be PaymentActionStatusSuccess, apart from authorisationFailurePAN.
+// Note: all the operations are executed in transaction.
 func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Authorization, processedDate time.Time) (*domain.Transaction, error) {
 	var (
 		tx                      *sql.Tx
@@ -148,7 +150,9 @@ func (s *Store) CreateTransaction(ctx context.Context, authorization *domain.Aut
 	return t, nil
 }
 
-//CreatePaymentAction will create payment action for a particular transaction.
+// CreatePaymentAction will create payment action of a type for a particular transaction.
+// All payment actions will be PaymentActionStatusSuccess apart from captureFailurePAN and refundFailurePAN.
+// A small query required to get the card PAN by transaction_id to cross check the PAN.
 func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestID uuid.UUID, paymentActionType domain.PaymentActionType,
 	amount *domain.Amount, processedDate time.Time) error {
 	var (
@@ -219,6 +223,7 @@ func (s *Store) CreatePaymentAction(ctx context.Context, transactionID, requestI
 	return nil
 }
 
+// GetTransaction returns the transaction given the authorizationID, also with the PaymentActionSummary.
 func (s *Store) GetTransaction(ctx context.Context, authorizationID uuid.UUID) (*domain.Transaction, error) {
 	rows, err := s.QueryContext(ctx, `
 		select t.id as t_id, t.request_id as t_request_id, t.amount, t.currency, p.id as p_id, p.type, p.status, p.amount, p.currency, p.request_id as p_request_id, p.updated_date

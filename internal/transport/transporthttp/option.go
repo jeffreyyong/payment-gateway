@@ -10,8 +10,10 @@ const (
 	authorizationHeaderKey = "Authorization"
 )
 
+// MiddlewareFunc type
 type MiddlewareFunc func(c *httpHandler) error
 
+// WithAuth is a function configuration for authorization
 func WithAuth(privilegedTokens map[string]string) MiddlewareFunc {
 	return func(h *httpHandler) error {
 		h.middlewareFuncs = []mux.MiddlewareFunc{NewAuthorizationMiddleware(privilegedTokens)}
@@ -19,11 +21,13 @@ func WithAuth(privilegedTokens map[string]string) MiddlewareFunc {
 	}
 }
 
+// HTTPAuthorizeRequest is the type to handles authorization of request
 type HTTPAuthorizeRequest struct {
 	next             http.Handler
 	privilegedTokens map[string]string
 }
 
+// NewAuthorizationMiddleware initialises a http.Handler implementation of authorization given the privileged tokens.
 func NewAuthorizationMiddleware(privilegedTokens map[string]string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return &HTTPAuthorizeRequest{
@@ -33,6 +37,7 @@ func NewAuthorizationMiddleware(privilegedTokens map[string]string) func(http.Ha
 	}
 }
 
+// ServeHTTP chains the middlewares and does the corresponding authorization for the incoming request.
 func (a HTTPAuthorizeRequest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	apiKey := r.Header.Get(authorizationHeaderKey)
 	if apiKey == "" {
