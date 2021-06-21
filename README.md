@@ -78,7 +78,7 @@ All of the endpoints require `request_id` for idempotency.
 
 
 ## Local Development
-- Dockerfile has been provided to containerized the application and PostgreSQL DB
+- Dockerfile has been provided to containerize the application and PostgreSQL DB
 ```shell
 go mod tidy
 make regenerate
