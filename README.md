@@ -9,10 +9,10 @@ It provides 4 payment actions: authorizate, void, capture and refund.
 
 
 ## How It Works
-All of the endpoints require request_id for idempotency
+All of the endpoints require `request_id` for idempotency.
 ### Authorize
 - POST /authorize
-- Authorization only happens during the transaction creation
+- Authorization only happens during the transaction creation.
 - sample JSON request body:
   ```json
   {
@@ -59,7 +59,7 @@ All of the endpoints require request_id for idempotency
   }
   ```
   
-### Refund
+### Refund
 - POST /refund
 - Refund can be triggered multiple times as long as the amount is less than the captured amount.
 - Capture cannot be made on a transaction after it's refunded.
