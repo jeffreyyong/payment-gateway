@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	uuid "github.com/kevinburke/go.uuid"
+
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
@@ -68,6 +70,7 @@ func (h *httpHandler) ApplyRoutes(m *httplistener.Mux) {
 	m.Use(h.middlewareFuncs...)
 }
 
+// Authorize handler to authorize transaction. It always return the transaction response if there's no error.
 func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -90,6 +93,13 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.RequestID == uuid.Nil {
+		errMsg := "request id is not provided"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeBadRequest)
 		return
@@ -135,6 +145,7 @@ func (h *httpHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Capture handler to capture transaction. It always return the transaction response if there's no error.
 func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -157,6 +168,20 @@ func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.RequestID == uuid.Nil {
+		errMsg := "request id is not provided"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.AuthorizationID == uuid.Nil {
+		errMsg := "authorization id is not provided"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeBadRequest)
 		return
@@ -199,6 +224,7 @@ func (h *httpHandler) Capture(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Refund handler to refund transaction. It always return the transaction response if there's no error.
 func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -221,6 +247,20 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.RequestID == uuid.Nil {
+		errMsg := "request id is not provided"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.AuthorizationID == uuid.Nil {
+		errMsg := "authorization id is not provided"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeBadRequest)
 		return
@@ -263,6 +303,7 @@ func (h *httpHandler) Refund(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Void handler to void transaction. It always return the transaction response if there's no error.
 func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -285,6 +326,20 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		errMsg := "failed to unmarshal request body"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.RequestID == uuid.Nil {
+		errMsg := "request id is not provided"
+		logging.Error(ctx, errMsg, zap.Error(err))
+		_ = WriteError(w, errMsg, CodeBadRequest)
+		return
+	}
+
+	if req.AuthorizationID == uuid.Nil {
+		errMsg := "authorization id is not provided"
 		logging.Error(ctx, errMsg, zap.Error(err))
 		_ = WriteError(w, errMsg, CodeBadRequest)
 		return
@@ -322,6 +377,7 @@ func (h *httpHandler) Void(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// helper mapper function to map to transaction response.
 func mapToTransactionResp(t *domain.Transaction) Transaction {
 	return Transaction{
 		ID:              t.ID,

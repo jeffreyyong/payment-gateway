@@ -6,37 +6,35 @@ import (
 	uuid "github.com/kevinburke/go.uuid"
 )
 
-// Do validation on http domain
+// AuthorizeRequest to unmarshal authorization request into
 type AuthorizeRequest struct {
 	PaymentSource PaymentSource `json:"payment_source"`
 	Amount        Amount        `json:"amount"`
 	RequestID     uuid.UUID     `json:"request_id"`
 	Description   string        `json:"description"`
-	Recipient     Recipient     `json:"recipient,omitempty"`
 }
 
+// CaptureRequest to unmarshal capture request into
 type CaptureRequest struct {
 	AuthorizationID uuid.UUID `json:"authorization_id"`
 	RequestID       uuid.UUID `json:"request_id"`
 	Amount          Amount    `json:"amount"`
 }
 
+// RefundRequest to unmarshal refund request into
 type RefundRequest struct {
 	AuthorizationID uuid.UUID `json:"authorization_id"`
 	RequestID       uuid.UUID `json:"request_id"`
 	Amount          Amount    `json:"amount"`
 }
 
+// VoidRequest to unmarshal void request into
 type VoidRequest struct {
 	AuthorizationID uuid.UUID `json:"authorization_id"`
 	RequestID       uuid.UUID `json:"request_id"`
 }
 
-type Recipient struct {
-	Postcode string `json:"postcode"` // The first part of the UK postcode for example W1T 4TJ would be W1T
-	LastName string `json:"last_name"`
-}
-
+// PaymentSource request
 type PaymentSource struct {
 	PAN         string `json:"pan"`
 	CVV         string `json:"cvv"`
@@ -44,12 +42,14 @@ type PaymentSource struct {
 	ExpiryYear  int    `json:"expiry_year"`
 }
 
+// Amount request
 type Amount struct {
 	MinorUnits uint64 `json:"minor_units"`
 	Exponent   uint8  `json:"exponent"`
 	Currency   string `json:"currency"`
 }
 
+// Transaction response
 type Transaction struct {
 	ID               uuid.UUID  `json:"id"`
 	AuthorizationID  uuid.UUID  `json:"authorization_id"`

@@ -5,6 +5,15 @@ import (
 	"strconv"
 )
 
+// Validate checks if a pan is all numeric first.
+// It then performs the validation algorithm:
+// 1. reverse the digits:
+// 2. if it's an even number:
+// 		a. times the digit by 2.
+// 		b. sum the digits if it's greater than 9,
+//	    	e.g. 16 will become 7 as it's 1 + 6
+// 3. sum all the numbers together
+// 4. if the sum ends in zero, it passes the validation else returns error.
 func Validate(pan string) error {
 	panNum, err := strconv.Atoi(pan)
 	if err != nil {

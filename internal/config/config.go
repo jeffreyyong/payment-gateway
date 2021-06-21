@@ -12,11 +12,6 @@ const (
 	defaultConfigFilePath = "config.yaml"
 )
 
-// FileProvider is a config provider for local files
-type FileProvider struct {
-	Filename string
-}
-
 // Config variables for the application
 type Config struct {
 	PostgresDSN      string            `yaml:"POSTGRES_DSN"`

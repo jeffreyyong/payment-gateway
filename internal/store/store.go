@@ -68,7 +68,7 @@ func New(address string) (*Store, error) {
 	return s, nil
 }
 
-// Migrate makes sure database migrations are up to date
+// Migrate makes sure database migrations are up to date with the right version
 func (s *Store) Migrate(path string) error {
 	// create migration driver
 	driver, err := postgres.WithInstance(s.DB, &postgres.Config{
@@ -116,6 +116,7 @@ func (s *Store) Ready(ctx context.Context) error {
 	return s.DB.PingContext(ctx)
 }
 
+// ExecInTransaction takes in function and execs it in transaction
 func (s *Store) ExecInTransaction(ctx context.Context, f func(context.Context) error) error {
 	txn, err := s.DB.Begin()
 	if err != nil {
@@ -133,6 +134,7 @@ func (s *Store) ExecInTransaction(ctx context.Context, f func(context.Context) e
 	return nil
 }
 
+// Exec executes db operation.
 func (s *Store) Exec(ctx context.Context, f func(ctx context.Context) error) error {
 	return f(context.WithValue(ctx, connKey{}, s.DB))
 }

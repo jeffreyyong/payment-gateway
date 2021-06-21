@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jeffreyyong/payment-gateway/internal/luhn"
-
 	"github.com/jonboulle/clockwork"
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/pkg/errors"
@@ -16,8 +14,10 @@ import (
 
 	"github.com/jeffreyyong/payment-gateway/internal/domain"
 	"github.com/jeffreyyong/payment-gateway/internal/logging"
+	"github.com/jeffreyyong/payment-gateway/internal/luhn"
 )
 
+// Store is the db interface
 type Store interface {
 	Exec(ctx context.Context, f func(ctx context.Context) error) error
 	ExecInTransaction(ctx context.Context, f func(ctx context.Context) error) error
@@ -28,13 +28,31 @@ type Store interface {
 		amount *domain.Amount, processedDate time.Time) error
 }
 
+// Service is the service struct.
 type Service struct {
 	store Store
 	clock clockwork.Clock
 }
 
-// TODO: have to map more unporcessable entity error
-// TODO: do more validation in the service layer
+// NewService initialises a new service with the store and some opts.
+func NewService(store Store, opts ...Option) (*Service, error) {
+	if store == nil {
+		return nil, fmt.Errorf("%w: store", errors.New("invalid param"))
+	}
+
+	s := &Service{store: store}
+
+	for _, opt := range opts {
+		if err := opt(s); err != nil {
+			return nil, err
+		}
+	}
+
+	return s, nil
+}
+
+// Authorize is the service function to authorize a transaction, it does the luhn validation on the credit card PAN
+// and subsequently create a transaction with the authorization.
 func (s *Service) Authorize(ctx context.Context, authorization *domain.Authorization) (*domain.Transaction, error) {
 	const errLogMsg = "unable to authorize transaction"
 	ctx = logging.WithFields(ctx,
@@ -57,6 +75,8 @@ func (s *Service) Authorize(ctx context.Context, authorization *domain.Authoriza
 	return transaction, nil
 }
 
+// Void retrieves the transaction that is in the DB based on authorizationID, checks idempotent requests and validation
+// and CreatePaymentAction of void for that transaction.
 func (s *Service) Void(ctx context.Context, void *domain.Void) (*domain.Transaction, error) {
 	const errLogMsg = "unable to void transaction"
 	ctx = logging.WithFields(ctx,
@@ -99,8 +119,8 @@ func (s *Service) Void(ctx context.Context, void *domain.Void) (*domain.Transact
 	return transaction, nil
 }
 
-// TODO: Put Godoc
-// put transaction in all of the service functions?
+// Capture retrieves the transaction that is in the DB based on authorizationID, checks idempotent requests and validation
+// and CreatePaymentAction of capture for that transaction.
 func (s *Service) Capture(ctx context.Context, capture *domain.Capture) (*domain.Transaction, error) {
 	const errLogMsg = "unable to capture payment"
 	ctx = logging.WithFields(ctx,
@@ -143,6 +163,8 @@ func (s *Service) Capture(ctx context.Context, capture *domain.Capture) (*domain
 	return transaction, nil
 }
 
+// Refund retrieves the transaction that is in the DB based on authorizationID, checks idempotent requests and validation
+// and CreatePaymentAction of refund for that transaction.
 func (s *Service) Refund(ctx context.Context, refund *domain.Refund) (*domain.Transaction, error) {
 	const errLogMsg = "unable to refund payment"
 	ctx = logging.WithFields(ctx,
@@ -183,20 +205,4 @@ func (s *Service) Refund(ctx context.Context, refund *domain.Refund) (*domain.Tr
 	}
 
 	return transaction, nil
-}
-
-func NewService(store Store, opts ...Option) (*Service, error) {
-	if store == nil {
-		return nil, fmt.Errorf("%w: store", errors.New("invalid param"))
-	}
-
-	s := &Service{store: store}
-
-	for _, opt := range opts {
-		if err := opt(s); err != nil {
-			return nil, err
-		}
-	}
-
-	return s, nil
 }
