@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jeffreyyong/payment-gateway/internal/luhn"
+
 	"github.com/jonboulle/clockwork"
 	uuid "github.com/kevinburke/go.uuid"
 	"github.com/pkg/errors"
@@ -38,6 +40,12 @@ func (s *Service) Authorize(ctx context.Context, authorization *domain.Authoriza
 	ctx = logging.WithFields(ctx,
 		zap.Stringer(logging.RequestID, authorization.RequestID),
 		zap.Stringer(logging.PaymentAction, domain.PaymentActionTypeAuthorization))
+
+	if err := luhn.Validate(authorization.PaymentSource.PAN); err != nil {
+		err = errors.Wrap(domain.ErrUnprocessable, err.Error())
+		logging.Error(ctx, errLogMsg, zap.Error(err))
+		return nil, err
+	}
 
 	transaction, err := s.store.CreateTransaction(ctx, authorization, s.clock.Now())
 	if err != nil {
