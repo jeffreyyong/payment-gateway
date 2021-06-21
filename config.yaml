@@ -1,1 +1,7 @@
 POSTGRES_DSN: "postgres://username:password@postgres:5432/db-payment-gateway?sslmode=disable"
+privileged_tokens:
+  checkout-token-1: merchant-1
+  checkout-token-2: merchant-2
+  checkout-token-3: merchant-3
+  checkout-token-4: merchant-4
+  checkout-token-5: merchant-5

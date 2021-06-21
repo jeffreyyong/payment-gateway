@@ -128,7 +128,7 @@ var (
 	mockRefundedTransaction = appendPaymentAction(mockCapturedTransaction, refundPaymentAction)
 )
 
-func TestService_Authorize_Success(t *testing.T) {
+func TestService_Authorize(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -146,7 +146,7 @@ func TestService_Authorize_Success(t *testing.T) {
 }
 
 // TODO: generate test coverage
-func TestService_Void_Success(t *testing.T) {
+func TestService_Void(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -168,7 +168,7 @@ func TestService_Void_Success(t *testing.T) {
 	assert.Equal(t, &mockVoidedTransaction, transaction)
 }
 
-func TestService_Capture_Success(t *testing.T) {
+func TestService_Capture(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -190,7 +190,7 @@ func TestService_Capture_Success(t *testing.T) {
 	assert.Equal(t, &mockVoidedTransaction, transaction)
 }
 
-func TestService_Refund_Success(t *testing.T) {
+func TestService_Refund(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
